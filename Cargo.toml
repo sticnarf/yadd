@@ -5,5 +5,6 @@ authors = ["Yilin Chen <sticnarf@gmail.com>"]
 
 [dependencies]
 trust-dns-proto = "0.5.0-alpha.5"
+trust-dns-server = "0.15.0-alpha.2"
 trust-dns = { version = "0.15.0-alpha.2", default-features = false, features = ["dns-over-rustls"] }
 tokio = "0.1.11"
