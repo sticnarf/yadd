@@ -9,7 +9,7 @@ where
 {
     fn new(server_addr: SocketAddr) -> Self;
 
-    fn query(&self, query: Query) -> ResponseFuture;
+    fn query(&mut self, query: Query) -> ResponseFuture;
 }
 
 pub mod simple;

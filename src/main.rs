@@ -14,7 +14,6 @@ use slog::Logger;
 use std::io;
 use tokio::net::udp::UdpSocket;
 use tokio::prelude::*;
-use tokio::runtime::current_thread;
 use trust_dns_proto::op::header::Header;
 use trust_dns_proto::rr::RrsetRecords;
 use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder};
@@ -52,8 +51,8 @@ impl RequestHandler for ChinaDnsHandler {
         let results_future = future::join_all(
             queries
                 .into_iter()
-                .map(|(query, resolver)| resolver.query(query)),
-        ).map_err(move |e| {
+                .map(|(query, mut resolver)| resolver.query(query)),
+        ).map_err(|e| {
             error!(LOGGER, "Resolve error: {:?}", e);
             e.into()
         });
@@ -69,17 +68,17 @@ impl RequestHandler for ChinaDnsHandler {
                 let mut header = Header::new();
                 header.set_id(id);
                 let message = builder.build(header);
-                response_handle.send_response(message)
-            }).map_err(move |e| {
+                let res = response_handle.send_response(message);
+                res
+            }).map_err(|e| {
                 error!(LOGGER, "Send error: {:?}", e);
             });
-        current_thread::spawn(send_future);
+        tokio::spawn(send_future);
         Ok(())
     }
 }
 
 fn main() {
-    let mut runtime = current_thread::Runtime::new().expect("Unable to create tokio runtime");
     let udp =
         UdpSocket::bind(&([127, 0, 0, 1], 5353).into()).expect("Unable to bind 127.0.0.1:5353");
     info!(LOGGER, "Listening UDP: 127.0.0.1:5353");
@@ -89,11 +88,8 @@ fn main() {
         server.register_socket(udp);
         future::empty()
     });
-    runtime.spawn(future);
 
-    if let Err(e) = runtime.run() {
-        error!(LOGGER, "{:?}", e);
-    }
+    tokio::run(future);
 }
 
 fn init_logger() -> Logger {
