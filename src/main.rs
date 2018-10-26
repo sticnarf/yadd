@@ -35,9 +35,9 @@ impl ChinaDnsHandler {
 }
 
 impl RequestHandler for ChinaDnsHandler {
-    fn handle_request<'q, 'a, R: ResponseHandler + 'static>(
-        &'a self,
-        request: &'q Request,
+    fn handle_request<R: ResponseHandler + 'static>(
+        &self,
+        request: &Request,
         response_handle: R,
     ) -> io::Result<()> {
         let id = request.message.id();

@@ -3,6 +3,7 @@ use LOGGER;
 
 use slog::debug;
 use std::net::SocketAddr;
+use std::time::Duration;
 use trust_dns::client::BasicClientHandle;
 use trust_dns::client::ClientFuture;
 use trust_dns::op::Query;
@@ -18,10 +19,13 @@ pub struct SimpleUdpResolver {
 }
 
 impl Resolver<OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>> for SimpleUdpResolver {
-    fn new(server_addr: SocketAddr) -> Self {
+    fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
         let (stream, handle) = UdpClientStream::new(server_addr);
-        let (bg, handle) = ClientFuture::new(stream, handle, None);
-        debug!(LOGGER, "Initialized");
+        let (bg, handle) = ClientFuture::with_timeout(stream, handle, timeout, None);
+        debug!(
+            LOGGER,
+            "SimpleUdpResolver initialized. DNS requests are forwarded to {}.", server_addr
+        );
         tokio::spawn(bg);
         SimpleUdpResolver { handle }
     }
@@ -64,10 +68,11 @@ mod tests {
             response.answers()
                 .iter()
                 .flat_map(|record| record.rdata().to_ip_addr())
-                .any(|ip| ip == expected);
+                .any(|ip| ip == expected)
         );
 
-        // Run a second time
+        // Run a second time.
+        // There once was a problem that the server would only respond to the first request.
         let mut resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
@@ -79,7 +84,7 @@ mod tests {
             response.answers()
                 .iter()
                 .flat_map(|record| record.rdata().to_ip_addr())
-                .any(|ip| ip == expected);
+                .any(|ip| ip == expected)
         );
     }
 }
