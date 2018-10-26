@@ -10,13 +10,16 @@ use lazy_static::lazy_static;
 use resolver::simple::SimpleUdpResolver;
 use resolver::Resolver;
 use slog::Logger;
-use slog::{error, info};
+use slog::{debug, error, info};
 use std::io;
 use tokio::net::udp::UdpSocket;
 use tokio::prelude::*;
+use trust_dns::serialize::binary::{BinDecoder, BinEncodable};
+use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::op::header::Header;
+use trust_dns_proto::op::header::MessageType;
 use trust_dns_proto::rr::RrsetRecords;
-use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder};
+use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder, Queries};
 use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
 
 lazy_static! {
@@ -40,39 +43,50 @@ impl RequestHandler for ChinaDnsHandler {
         request: &Request,
         response_handle: R,
     ) -> io::Result<()> {
-        let id = request.message.id();
-        let resolver = self.simple.clone();
-        let queries: Vec<_> = request
+        debug!(LOGGER, "Received request: {:?}", request.message);
+        let mut resolver = self.simple.clone();
+        // We ignore all queries expect the first one.
+        // Although it is not standard conformant, it should just work in the real world.
+        let query = request
             .message
             .queries()
             .iter()
-            .map(|query| (query.original().clone(), resolver.clone()))
-            .collect();
-        let results_future = future::join_all(
-            queries
-                .into_iter()
-                .map(|(query, mut resolver)| resolver.query(query)),
-        ).map_err(|e| {
-            error!(LOGGER, "Resolve error: {:?}", e);
-            e.into()
-        });
-        let send_future = results_future
-            .and_then(move |responses| {
-                let mut builder = MessageResponseBuilder::new(None);
-                for mut resp in &responses {
+            .map(|q| q.original().clone())
+            .next();
+        let query_bytes = query.clone().map(|q| q.to_bytes());
+
+        let result_future =
+            future::lazy(move || query.map(move |q| resolver.query(q))).then(|res| match res {
+                Ok(resp) => Ok(resp),
+                Err(e) => {
+                    error!(LOGGER, "Resolve error: {:?}", e);
+                    Ok(None)
+                }
+            });
+
+        // Build response header
+        let mut header = Header::new();
+        header.set_message_type(MessageType::Response);
+        header.set_id(request.message.id());
+
+        let send_future = result_future
+            .and_then(move |resp| {
+                let query_bytes = Transpose::transpose(query_bytes)?;
+                let queries = Transpose::transpose(query_bytes.as_ref().map(|bytes| {
+                    let mut decoder = BinDecoder::new(bytes);
+                    Queries::read(&mut decoder, 1)
+                }))?;
+                let mut builder = MessageResponseBuilder::new(queries.as_ref());
+                if let Some(ref resp) = resp {
                     let answers = resp.answers();
                     builder.answers(AuthLookup::Records(LookupRecords::RecordsIter(
                         RrsetRecords::RecordsOnly(answers.iter()),
                     )));
                 }
-                let mut header = Header::new();
-                header.set_id(id);
                 let message = builder.build(header);
-                let res = response_handle.send_response(message);
-                res
-            }).map_err(|e| {
-                error!(LOGGER, "Send error: {:?}", e);
-            });
+                Ok(response_handle.send_response(message)?)
+            }).map_err(|e: ProtoError| error!(LOGGER, "{:?}", e));
+
         tokio::spawn(send_future);
         Ok(())
     }
@@ -100,6 +114,24 @@ fn init_logger() -> Logger {
         .level(Severity::Debug)
         .build()
         .expect("Unable to create logger")
+}
+
+// Wait for #47338 to be stable
+trait Transpose {
+    type Output;
+    fn transpose(self) -> Self::Output;
+}
+
+impl<T, E> Transpose for Option<Result<T, E>> {
+    type Output = Result<Option<T>, E>;
+
+    fn transpose(self) -> Self::Output {
+        match self {
+            Some(Ok(x)) => Ok(Some(x)),
+            Some(Err(e)) => Err(e),
+            None => Ok(None),
+        }
+    }
 }
 
 mod resolver;

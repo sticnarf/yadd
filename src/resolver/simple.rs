@@ -65,7 +65,8 @@ mod tests {
                 resolver2.query(query)
             })).expect("Unable to get response");
         assert!(
-            response.answers()
+            response
+                .answers()
                 .iter()
                 .flat_map(|record| record.rdata().to_ip_addr())
                 .any(|ip| ip == expected)
@@ -81,7 +82,8 @@ mod tests {
                 resolver2.query(query)
             })).expect("Unable to get response");
         assert!(
-            response.answers()
+            response
+                .answers()
                 .iter()
                 .flat_map(|record| record.rdata().to_ip_addr())
                 .any(|ip| ip == expected)
