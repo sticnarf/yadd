@@ -1,16 +1,16 @@
-#[macro_use]
+extern crate lazy_static;
 extern crate slog;
 extern crate sloggers;
 extern crate tokio;
 extern crate trust_dns;
 extern crate trust_dns_proto;
 extern crate trust_dns_server;
-#[macro_use]
-extern crate lazy_static;
 
+use lazy_static::lazy_static;
 use resolver::simple::SimpleUdpResolver;
 use resolver::Resolver;
 use slog::Logger;
+use slog::{error, info};
 use std::io;
 use tokio::net::udp::UdpSocket;
 use tokio::prelude::*;

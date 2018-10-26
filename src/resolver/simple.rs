@@ -1,6 +1,7 @@
 use super::Resolver;
 use LOGGER;
 
+use slog::debug;
 use std::net::SocketAddr;
 use trust_dns::client::BasicClientHandle;
 use trust_dns::client::ClientFuture;
@@ -21,7 +22,7 @@ impl Resolver<OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>> for Simp
         let (stream, handle) = UdpClientStream::new(server_addr);
         let (bg, handle) = ClientFuture::new(stream, handle, None);
         debug!(LOGGER, "Initialized");
-        ::tokio::spawn(bg);
+        tokio::spawn(bg);
         SimpleUdpResolver { handle }
     }
 
