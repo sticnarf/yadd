@@ -7,12 +7,7 @@ authors = ["Yilin Chen <sticnarf@gmail.com>"]
 trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns" }
 trust-dns-server = { git = "https://github.com/bluejekyll/trust-dns" }
 trust-dns = { git = "https://github.com/bluejekyll/trust-dns", default-features = false, features = ["dns-over-rustls"] }
-tokio = "0.1.12"
+tokio = "0.1.11"
 slog = "2.4.1"
 sloggers = "0.3.1"
 lazy_static = "1.1.0"
-
-[patch.'https://github.com/bluejekyll/trust-dns']
-trust-dns-proto = { git = "https://github.com/sticnarf/trust-dns", branch = 'make-response-handler-send' }
-trust-dns = { git = "https://github.com/sticnarf/trust-dns", branch = 'make-response-handler-send', default-features = false, features = ["dns-over-rustls"] }
-trust-dns-server = { git = "https://github.com/sticnarf/trust-dns", branch = 'make-response-handler-send' }
