@@ -42,7 +42,6 @@ mod tests {
     use std::net::IpAddr;
     use std::str::FromStr;
     use std::thread;
-    use tokio::prelude::*;
     use tokio::runtime::Runtime;
     use trust_dns::rr::{Name, RecordType};
 
@@ -55,21 +54,21 @@ mod tests {
                 future::ok::<SimpleUdpResolver, ()>(SimpleUdpResolver::new(
                     ([1, 1, 1, 1], 53).into(),
                 ))
-            })).unwrap();
+            }))
+            .unwrap();
         let mut resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =
                     Query::query(Name::from_str("one.one.one.one.").unwrap(), RecordType::A);
                 resolver2.query(query)
-            })).expect("Unable to get response");
-        assert!(
-            response
-                .answers()
-                .iter()
-                .flat_map(|record| record.rdata().to_ip_addr())
-                .any(|ip| ip == expected)
-        );
+            }))
+            .expect("Unable to get response");
+        assert!(response
+            .answers()
+            .iter()
+            .flat_map(|record| record.rdata().to_ip_addr())
+            .any(|ip| ip == expected));
 
         thread::sleep(Duration::from_secs(1));
 
@@ -81,13 +80,12 @@ mod tests {
                 let query =
                     Query::query(Name::from_str("one.one.one.one.").unwrap(), RecordType::A);
                 resolver2.query(query)
-            })).expect("Unable to get response");
-        assert!(
-            response
-                .answers()
-                .iter()
-                .flat_map(|record| record.rdata().to_ip_addr())
-                .any(|ip| ip == expected)
-        );
+            }))
+            .expect("Unable to get response");
+        assert!(response
+            .answers()
+            .iter()
+            .flat_map(|record| record.rdata().to_ip_addr())
+            .any(|ip| ip == expected));
     }
 }

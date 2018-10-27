@@ -4,21 +4,17 @@ use LOGGER;
 use self::ConnectionState::*;
 use slog::{debug, error, warn};
 use spin::RwLock;
-use std::io;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
-use tokio::prelude::*;
-use tokio::timer::Timeout;
+use tokio::timer::Delay;
 use trust_dns::client::{BasicClientHandle, ClientFuture};
 use trust_dns::tcp::TcpClientStream;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::error::ProtoErrorKind;
 use trust_dns_proto::op::Query;
 use trust_dns_proto::xfer::dns_handle::DnsHandle;
-use trust_dns_proto::xfer::DnsRequestOptions;
 use trust_dns_proto::xfer::DnsResponse;
 use trust_dns_proto::xfer::{DnsMultiplexerSerialResponse, OneshotDnsResponseReceiver};
 
@@ -31,26 +27,39 @@ pub struct SimpleTcpResolver {
 
 pub enum ConnectionState {
     NotConnected,
+    Connecting(BasicClientHandle<DnsMultiplexerSerialResponse>),
     Connected(BasicClientHandle<DnsMultiplexerSerialResponse>),
 }
 
 impl SimpleTcpResolver {
     fn connect(&self) {
-        let state = self.state.read();
-        match &*state {
+        let mut state_ref = self.state.write();
+        match &*state_ref {
             NotConnected => {
-                drop(state);
-
                 let server_addr = self.server_addr;
                 let (connect, handle) = TcpClientStream::new(server_addr);
+                let state = self.state.clone();
                 let stream = connect.map(move |stream| {
                     debug!(LOGGER, "TCP connection to {} established.", server_addr);
+                    let mut state = state.write();
+                    match &mut *state {
+                        Connecting(handle) => {
+                            *state = Connected(handle.clone());
+                        }
+                        _ => {
+                            warn!(
+                                LOGGER,
+                                "Weird ConnectionState! Change it back to NotConnected"
+                            );
+                            *state = NotConnected;
+                        }
+                    }
                     stream
                 });
 
                 let (bg, handle) =
                     ClientFuture::with_timeout(Box::new(stream), handle, self.timeout, None);
-                *self.state.write() = Connected(handle);
+                *state_ref = Connecting(handle);
 
                 let state = self.state.clone();
                 let bg = bg.and_then(move |()| {
@@ -82,7 +91,7 @@ impl Resolver for SimpleTcpResolver {
         TcpResponse {
             resolver: self.clone(),
             query,
-            deadline: Instant::now() + self.timeout,
+            deadline: Delay::new(Instant::now() + self.timeout),
             resp_future: None,
         }
     }
@@ -91,7 +100,7 @@ impl Resolver for SimpleTcpResolver {
 pub struct TcpResponse {
     resolver: SimpleTcpResolver,
     query: Query,
-    deadline: Instant,
+    deadline: Delay,
     resp_future: Option<OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>>,
 }
 
@@ -100,9 +109,10 @@ impl Future for TcpResponse {
     type Error = ProtoError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        debug!(LOGGER, "TcpResponse poll!");
-        if Instant::now() > self.deadline {
-            return Err(ProtoErrorKind::Timeout.into());
+        match self.deadline.poll() {
+            Ok(Async::Ready(_)) => return Err(ProtoErrorKind::Timeout.into()),
+            Err(e) => return Err(e.into()),
+            _ => {}
         }
 
         match self
@@ -119,8 +129,24 @@ impl Future for TcpResponse {
                 Ok(Async::NotReady)
             }
             Some(Err(e)) => {
-                error!(LOGGER, "Lookup error: {:?}", e);
-                Err(e)
+                let state = self.resolver.state.read();
+                match &*state {
+                    Connecting(_) => {
+                        drop(state);
+                        debug!(
+                            LOGGER,
+                            "Lookup error occurrs when connection is not established. Reset connection."
+                        );
+                        self.resp_future = None;
+                        *self.resolver.state.write() = NotConnected;
+                        Ok(Async::NotReady)
+                    }
+                    _ => {
+                        error!(LOGGER, "Lookup error: {:?}. Will retry.", e);
+                        self.resp_future = None;
+                        Ok(Async::NotReady)
+                    }
+                }
             }
             None => {
                 let state = self.resolver.state.read();
@@ -131,7 +157,7 @@ impl Future for TcpResponse {
                         self.resolver.connect();
                         Ok(Async::NotReady)
                     }
-                    Connected(handle) => {
+                    Connecting(handle) | Connected(handle) => {
                         let mut resp_future =
                             handle.clone().lookup(self.query.clone(), DNS_OPTIONS);
                         match resp_future.poll() {
@@ -140,7 +166,7 @@ impl Future for TcpResponse {
                                 Ok(Async::Ready(resp))
                             }
                             Ok(Async::NotReady) => {
-                                debug!(LOGGER, "Not ready. Put it into Option.");
+                                debug!(LOGGER, "Not ready. Save it.");
                                 self.resp_future = Some(resp_future);
                                 Ok(Async::NotReady)
                             }
