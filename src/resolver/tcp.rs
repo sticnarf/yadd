@@ -23,8 +23,7 @@ pub struct SimpleTcpResolver {
 }
 
 impl Resolver for SimpleTcpResolver {
-    type ResponseFuture =
-        TcpResponseFuture<OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>>;
+    type ResponseFuture = OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>;
 
     fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
         SimpleTcpResolver {
@@ -34,42 +33,14 @@ impl Resolver for SimpleTcpResolver {
     }
 
     fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        let (connect, handle) = TcpClientStream::with_timeout(self.server_addr, self.timeout);
-        let (bg, mut handle) = ClientFuture::new(Box::new(connect), handle, None);
+        let (connect, handle) = TcpClientStream::new(self.server_addr);
+        let (bg, mut handle) =
+            ClientFuture::with_timeout(Box::new(connect), handle, self.timeout, None);
         tokio::spawn(bg);
         let dns_options = DnsRequestOptions {
             expects_multiple_responses: false,
         };
-        TcpResponseFuture {
-            inner: Timeout::new(handle.lookup(query, dns_options), self.timeout),
-        }
-    }
-}
-
-pub struct TcpResponseFuture<T>
-where
-    T: Future<Item = DnsResponse, Error = ProtoError> + 'static + Send,
-{
-    inner: Timeout<T>,
-}
-
-impl<T> Future for TcpResponseFuture<T>
-where
-    T: Future<Item = DnsResponse, Error = ProtoError> + 'static + Send,
-{
-    type Item = <T as Future>::Item;
-    type Error = ProtoError;
-
-    fn poll(&mut self) -> Result<Async<<Self as Future>::Item>, <Self as Future>::Error> {
-        let e = match self.inner.poll() {
-            Ok(Async::NotReady) => return Ok(Async::NotReady),
-            other => other,
-        };
-        e.map_err(|e| {
-            e.into_inner().unwrap_or_else(|| {
-                io::Error::new(io::ErrorKind::TimedOut, "query timed out").into()
-            })
-        })
+        handle.lookup(query, dns_options)
     }
 }
 
