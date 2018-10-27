@@ -43,6 +43,7 @@ impl Resolver for SimpleUdpResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
     use std::net::IpAddr;
     use std::str::FromStr;
     use tokio::prelude::*;
@@ -73,6 +74,8 @@ mod tests {
                 .flat_map(|record| record.rdata().to_ip_addr())
                 .any(|ip| ip == expected)
         );
+
+        thread::sleep(Duration::from_secs(1));
 
         // Run a second time.
         // There once was a problem that the server would only respond to the first request.

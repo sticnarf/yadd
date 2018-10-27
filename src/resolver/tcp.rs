@@ -33,7 +33,12 @@ impl Resolver for SimpleTcpResolver {
     }
 
     fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        let (connect, handle) = TcpClientStream::new(self.server_addr);
+        let server_addr = self.server_addr;
+        let (connect, handle) = TcpClientStream::new(server_addr);
+        let connect = connect.map(move |stream| {
+            debug!(LOGGER, "TCP connection to {} established.", server_addr);
+            stream
+        });
         let (bg, mut handle) =
             ClientFuture::with_timeout(Box::new(connect), handle, self.timeout, None);
         tokio::spawn(bg);
