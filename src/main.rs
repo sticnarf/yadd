@@ -7,7 +7,7 @@ extern crate trust_dns_proto;
 extern crate trust_dns_server;
 
 use lazy_static::lazy_static;
-use resolver::simple::SimpleUdpResolver;
+use resolver::udp::SimpleUdpResolver;
 use resolver::Resolver;
 use slog::Logger;
 use slog::{debug, error, info};
@@ -21,19 +21,22 @@ use trust_dns_proto::op::header::MessageType;
 use trust_dns_proto::rr::RrsetRecords;
 use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder, Queries};
 use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
+use resolver::tcp::SimpleTcpResolver;
 
 lazy_static! {
     static ref LOGGER: Logger = init_logger();
 }
 
 struct ChinaDnsHandler {
-    simple: SimpleUdpResolver,
+    udp: SimpleUdpResolver,
+    tcp: SimpleTcpResolver,
 }
 
 impl ChinaDnsHandler {
     fn new() -> Self {
-        let resolver = SimpleUdpResolver::new(([223, 5, 5, 5], 53).into());
-        ChinaDnsHandler { simple: resolver }
+        let udp = SimpleUdpResolver::new(([223, 5, 5, 5], 53).into());
+        let tcp = SimpleTcpResolver::new(([1, 1, 1, 1], 53).into());
+        ChinaDnsHandler { udp, tcp }
     }
 }
 
@@ -44,7 +47,7 @@ impl RequestHandler for ChinaDnsHandler {
         response_handle: R,
     ) -> io::Result<()> {
         debug!(LOGGER, "Received request: {:?}", request.message);
-        let mut resolver = self.simple.clone();
+        let mut resolver = self.tcp.clone();
         // We ignore all queries expect the first one.
         // Although it is not standard conformant, it should just work in the real world.
         let query = request
