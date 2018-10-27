@@ -1,4 +1,4 @@
-use super::Resolver;
+use super::*;
 use LOGGER;
 
 use slog::debug;
@@ -10,7 +10,6 @@ use trust_dns::op::Query;
 use trust_dns::udp::UdpClientStream;
 use trust_dns_proto::xfer::dns_handle::DnsHandle;
 use trust_dns_proto::xfer::dns_multiplexer::DnsMultiplexerSerialResponse;
-use trust_dns_proto::xfer::dns_request::DnsRequestOptions;
 use trust_dns_proto::xfer::OneshotDnsResponseReceiver;
 
 #[derive(Clone)]
@@ -33,19 +32,16 @@ impl Resolver for SimpleUdpResolver {
     }
 
     fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        let dns_options = DnsRequestOptions {
-            expects_multiple_responses: false,
-        };
-        self.handle.lookup(query, dns_options)
+        self.handle.lookup(query, DNS_OPTIONS)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
     use std::net::IpAddr;
     use std::str::FromStr;
+    use std::thread;
     use tokio::prelude::*;
     use tokio::runtime::Runtime;
     use trust_dns::rr::{Name, RecordType};

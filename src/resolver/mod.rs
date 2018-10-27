@@ -3,9 +3,9 @@ use std::time::Duration;
 use tokio::prelude::*;
 use trust_dns::op::{DnsResponse, Query};
 use trust_dns_proto::error::ProtoError;
+use trust_dns_proto::xfer::DnsRequestOptions;
 
-pub trait Resolver: Clone + Send + Sync
-{
+pub trait Resolver: Clone + Send + Sync {
     type ResponseFuture: Future<Item = DnsResponse, Error = ProtoError> + 'static + Send;
 
     fn new(server_addr: SocketAddr) -> Self {
@@ -17,5 +17,9 @@ pub trait Resolver: Clone + Send + Sync
     fn query(&mut self, query: Query) -> Self::ResponseFuture;
 }
 
-pub mod udp;
+const DNS_OPTIONS: DnsRequestOptions = DnsRequestOptions {
+    expects_multiple_responses: false,
+};
+
 pub mod tcp;
+pub mod udp;

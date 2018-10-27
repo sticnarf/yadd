@@ -11,3 +11,4 @@ tokio = "0.1.11"
 slog = "2.4.1"
 sloggers = "0.3.1"
 lazy_static = "1.1.0"
+spin = { version = "0.4", default-features = true }

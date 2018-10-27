@@ -1,12 +1,16 @@
+#![feature(nll)]
+
 extern crate lazy_static;
 extern crate slog;
 extern crate sloggers;
+extern crate spin;
 extern crate tokio;
 extern crate trust_dns;
 extern crate trust_dns_proto;
 extern crate trust_dns_server;
 
 use lazy_static::lazy_static;
+use resolver::tcp::SimpleTcpResolver;
 use resolver::udp::SimpleUdpResolver;
 use resolver::Resolver;
 use slog::Logger;
@@ -21,7 +25,6 @@ use trust_dns_proto::op::header::MessageType;
 use trust_dns_proto::rr::RrsetRecords;
 use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder, Queries};
 use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
-use resolver::tcp::SimpleTcpResolver;
 
 lazy_static! {
     static ref LOGGER: Logger = init_logger();
@@ -88,7 +91,8 @@ impl RequestHandler for ChinaDnsHandler {
                 }
                 let message = builder.build(header);
                 Ok(response_handle.send_response(message)?)
-            }).map_err(|e: ProtoError| error!(LOGGER, "{:?}", e));
+            })
+            .map_err(|e: ProtoError| error!(LOGGER, "{:?}", e));
 
         tokio::spawn(send_future);
         Ok(())
@@ -99,6 +103,7 @@ fn main() {
     let udp =
         UdpSocket::bind(&([127, 0, 0, 1], 5353).into()).expect("Unable to bind 127.0.0.1:5353");
     info!(LOGGER, "Listening UDP: 127.0.0.1:5353");
+    //    trust_dns_server::logger::debug();
 
     let future = future::lazy(move || {
         let server = trust_dns_server::ServerFuture::new(ChinaDnsHandler::new());
