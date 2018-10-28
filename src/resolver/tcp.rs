@@ -2,8 +2,9 @@ use super::*;
 use LOGGER;
 
 use self::ConnectionState::*;
+use lock_api::{RwLock, RwLockReadGuard};
+use parking_lot::RawRwLock;
 use slog::{debug, error, warn};
-use spin::RwLock;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,7 +23,7 @@ use trust_dns_proto::xfer::{DnsMultiplexerSerialResponse, OneshotDnsResponseRece
 pub struct SimpleTcpResolver {
     server_addr: SocketAddr,
     timeout: Duration,
-    state: Arc<RwLock<ConnectionState>>,
+    state: Arc<RwLock<RawRwLock, ConnectionState>>,
 }
 
 pub enum ConnectionState {
@@ -149,12 +150,13 @@ impl Future for TcpResponse {
                 }
             }
             None => {
-                let state = self.resolver.state.read();
+                let mut state = self.resolver.state.read();
                 match &*state {
                     NotConnected => {
-                        drop(state);
                         debug!(LOGGER, "Not connected. Try to connect.");
-                        self.resolver.connect();
+                        RwLockReadGuard::unlocked(&mut state, || {
+                            self.resolver.connect();
+                        });
                         Ok(Async::NotReady)
                     }
                     Connecting(handle) | Connected(handle) => {
@@ -162,7 +164,7 @@ impl Future for TcpResponse {
                             handle.clone().lookup(self.query.clone(), DNS_OPTIONS);
                         match resp_future.poll() {
                             Ok(Async::Ready(resp)) => {
-                                debug!(LOGGER, "Immediately ready. Really?");
+                                warn!(LOGGER, "Immediately ready. Really?");
                                 Ok(Async::Ready(resp))
                             }
                             Ok(Async::NotReady) => {

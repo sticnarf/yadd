@@ -1,9 +1,10 @@
 #![feature(nll)]
 
 extern crate lazy_static;
+extern crate lock_api;
+extern crate parking_lot;
 extern crate slog;
 extern crate sloggers;
-extern crate spin;
 extern crate tokio;
 extern crate trust_dns;
 extern crate trust_dns_proto;
