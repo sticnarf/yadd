@@ -13,3 +13,8 @@ sloggers = "0.3.1"
 lazy_static = "1.1.0"
 parking_lot = { version = "0.6.4", features = ["nightly"] }
 lock_api = "0.1.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = 'abort'
