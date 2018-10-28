@@ -17,10 +17,12 @@ pub struct SimpleUdpResolver {
     handle: BasicClientHandle<DnsMultiplexerSerialResponse>,
 }
 
-impl Resolver for SimpleUdpResolver {
-    type ResponseFuture = OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>;
+impl SimpleUdpResolver {
+    pub fn new(server_addr: SocketAddr) -> Self {
+        Self::with_timeout(server_addr, Duration::from_secs(2))
+    }
 
-    fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
+    pub fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
         let (stream, handle) = UdpClientStream::new(server_addr);
         let (bg, handle) = ClientFuture::with_timeout(stream, handle, timeout, None);
         debug!(
@@ -30,6 +32,10 @@ impl Resolver for SimpleUdpResolver {
         tokio::spawn(bg);
         SimpleUdpResolver { handle }
     }
+}
+
+impl Resolver for SimpleUdpResolver {
+    type ResponseFuture = OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>;
 
     fn query(&mut self, query: Query) -> Self::ResponseFuture {
         self.handle.lookup(query, DNS_OPTIONS)

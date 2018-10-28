@@ -14,6 +14,11 @@ lazy_static = "1.1.0"
 parking_lot = { version = "0.6.4", features = ["nightly"] }
 lock_api = "0.1.4"
 
+[patch."https://github.com/bluejekyll/trust-dns"]
+trust-dns-proto = { git = "https://github.com/sticnarf/trust-dns", branch = "generalize-rrset-records" }
+trust-dns-server = { git = "https://github.com/sticnarf/trust-dns", branch = "generalize-rrset-records" }
+trust-dns = { git = "https://github.com/sticnarf/trust-dns", branch = "generalize-rrset-records", default-features = false, features = ["dns-over-rustls"] }
+
 [profile.release]
 lto = true
 codegen-units = 1

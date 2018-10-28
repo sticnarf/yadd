@@ -33,6 +33,18 @@ pub enum ConnectionState {
 }
 
 impl SimpleTcpResolver {
+    pub fn new(server_addr: SocketAddr) -> Self {
+        Self::with_timeout(server_addr, Duration::from_secs(2))
+    }
+
+    pub fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
+        SimpleTcpResolver {
+            server_addr,
+            timeout,
+            state: Arc::new(RwLock::new(NotConnected)),
+        }
+    }
+
     fn connect(&self) {
         let mut state_ref = self.state.write();
         match &*state_ref {
@@ -79,14 +91,6 @@ impl SimpleTcpResolver {
 
 impl Resolver for SimpleTcpResolver {
     type ResponseFuture = TcpResponse;
-
-    fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
-        SimpleTcpResolver {
-            server_addr,
-            timeout,
-            state: Arc::new(RwLock::new(NotConnected)),
-        }
-    }
 
     fn query(&mut self, query: Query) -> Self::ResponseFuture {
         TcpResponse {
@@ -143,7 +147,7 @@ impl Future for TcpResponse {
                         Ok(Async::NotReady)
                     }
                     _ => {
-                        error!(LOGGER, "Lookup error: {:?}. Will retry.", e);
+                        error!(LOGGER, "Lookup error: {}. Will retry.", e);
                         self.resp_future = None;
                         Ok(Async::NotReady)
                     }
@@ -173,7 +177,7 @@ impl Future for TcpResponse {
                                 Ok(Async::NotReady)
                             }
                             Err(e) => {
-                                error!(LOGGER, "Immediate lookup error: {:?}", e);
+                                error!(LOGGER, "Immediate lookup error: {}", e);
                                 Err(e)
                             }
                         }

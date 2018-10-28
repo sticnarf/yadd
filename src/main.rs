@@ -66,7 +66,7 @@ impl RequestHandler for ChinaDnsHandler {
             future::lazy(move || query.map(move |q| resolver.query(q))).then(|res| match res {
                 Ok(resp) => Ok(resp),
                 Err(e) => {
-                    error!(LOGGER, "Resolve error: {:?}", e);
+                    error!(LOGGER, "Resolve error: {}", e);
                     Ok(None)
                 }
             });
@@ -78,6 +78,7 @@ impl RequestHandler for ChinaDnsHandler {
 
         let send_future = result_future
             .and_then(move |resp| {
+                // Copy the question section
                 let query_bytes = Transpose::transpose(query_bytes)?;
                 let queries = Transpose::transpose(query_bytes.as_ref().map(|bytes| {
                     let mut decoder = BinDecoder::new(bytes);
@@ -93,7 +94,7 @@ impl RequestHandler for ChinaDnsHandler {
                 let message = builder.build(header);
                 Ok(response_handle.send_response(message)?)
             })
-            .map_err(|e: ProtoError| error!(LOGGER, "{:?}", e));
+            .map_err(|e: ProtoError| error!(LOGGER, "{}", e));
 
         tokio::spawn(send_future);
         Ok(())
