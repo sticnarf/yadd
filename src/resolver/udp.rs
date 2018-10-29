@@ -1,5 +1,5 @@
 use super::*;
-use LOGGER;
+use crate::LOGGER;
 
 use slog::debug;
 use std::net::SocketAddr;

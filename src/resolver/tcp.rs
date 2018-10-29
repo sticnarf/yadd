@@ -1,5 +1,5 @@
 use super::*;
-use LOGGER;
+use crate::LOGGER;
 
 use self::ConnectionState::*;
 use lock_api::{RwLock, RwLockReadGuard};

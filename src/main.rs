@@ -13,9 +13,9 @@ extern crate trust_dns_proto;
 extern crate trust_dns_server;
 
 use lazy_static::lazy_static;
-use resolver::tcp::SimpleTcpResolver;
-use resolver::udp::SimpleUdpResolver;
-use resolver::Resolver;
+use crate::resolver::tcp::SimpleTcpResolver;
+use crate::resolver::udp::SimpleUdpResolver;
+use crate::resolver::Resolver;
 use slog::Logger;
 use slog::{debug, error, info};
 use std::io;

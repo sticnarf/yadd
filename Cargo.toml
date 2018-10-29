@@ -2,6 +2,7 @@
 name = "chinadns-rust"
 version = "0.1.0"
 authors = ["Yilin Chen <sticnarf@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns" }
