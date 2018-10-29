@@ -1,11 +1,13 @@
 #![feature(nll)]
 
+use crate::resolver::mixed::MixedResolver;
 use crate::resolver::tcp::SimpleTcpResolver;
 use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
 
 use std::io;
 
+use failure::Error;
 use lazy_static::lazy_static;
 use slog::Logger;
 use slog::{debug, error, info};
@@ -25,27 +27,39 @@ lazy_static! {
     static ref LOGGER: Logger = init_logger();
 }
 
-struct ChinaDnsHandler {
-    udp: SimpleUdpResolver,
-    tcp: SimpleTcpResolver,
+struct ChinaDnsHandler<C, A>
+where
+    C: Resolver,
+    A: Resolver,
+{
+    mixed: MixedResolver<C, A>,
 }
 
-impl ChinaDnsHandler {
-    fn new() -> Self {
-        let udp = SimpleUdpResolver::new(([223, 5, 5, 5], 53).into());
-        let tcp = SimpleTcpResolver::new(([1, 1, 1, 1], 53).into());
-        ChinaDnsHandler { udp, tcp }
+impl<C, A> ChinaDnsHandler<C, A>
+where
+    C: Resolver,
+    A: Resolver,
+{
+    fn new() -> ChinaDnsHandler<SimpleUdpResolver, SimpleTcpResolver> {
+        let china = SimpleUdpResolver::new(([223, 5, 5, 5], 53).into());
+        let abroad = SimpleTcpResolver::new("[2620:0:ccc::2]:443".parse().unwrap());
+        let mixed = MixedResolver::new(china, abroad, "chnroutes.txt").unwrap();
+        ChinaDnsHandler { mixed }
     }
 }
 
-impl RequestHandler for ChinaDnsHandler {
+impl<C, A> RequestHandler for ChinaDnsHandler<C, A>
+where
+    C: Resolver + 'static,
+    A: Resolver + 'static,
+{
     fn handle_request<R: ResponseHandler + 'static>(
         &self,
         request: &Request<'_>,
         response_handle: R,
     ) -> io::Result<()> {
         debug!(LOGGER, "Received request: {:?}", request.message);
-        let mut resolver = self.tcp.clone();
+        let mut resolver = self.mixed.clone();
         // We ignore all queries expect the first one.
         // Although it is not standard conformant, it should just work in the real world.
         let query = request
@@ -99,10 +113,12 @@ fn main() {
     let udp =
         UdpSocket::bind(&([127, 0, 0, 1], 5353).into()).expect("Unable to bind 127.0.0.1:5353");
     info!(LOGGER, "Listening UDP: 127.0.0.1:5353");
-    //    trust_dns_server::logger::debug();
+    trust_dns_server::logger::debug();
 
     let future = future::lazy(move || {
-        let server = trust_dns_server::ServerFuture::new(ChinaDnsHandler::new());
+        let resolver: ChinaDnsHandler<SimpleUdpResolver, SimpleTcpResolver> =
+            ChinaDnsHandler::<SimpleUdpResolver, SimpleTcpResolver>::new();
+        let server = trust_dns_server::ServerFuture::new(resolver);
         server.register_socket(udp);
         future::empty()
     });

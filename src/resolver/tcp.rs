@@ -117,7 +117,13 @@ impl Future for TcpResponse {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         match self.deadline.poll() {
-            Ok(Async::Ready(_)) => return Err(ProtoErrorKind::Timeout.into()),
+            Ok(Async::Ready(_)) => {
+                // put unfinished task to background
+                if let Some(resp_future) = self.resp_future.take() {
+                    let _ = tokio::spawn(resp_future.map(|_| ()).map_err(|_| ()));
+                }
+                return Err(ProtoErrorKind::Timeout.into());
+            }
             Err(e) => return Err(e.into()),
             _ => {}
         }
@@ -179,8 +185,10 @@ impl Future for TcpResponse {
                                 Ok(Async::NotReady)
                             }
                             Err(e) => {
-                                error!(LOGGER, "Immediate lookup error: {}", e);
-                                Err(e)
+                                use failure::Fail;
+                                error!(LOGGER, "Immediate lookup error: {:?}", e.backtrace());
+                                self.resp_future = None;
+                                Ok(Async::NotReady)
                             }
                         }
                     }

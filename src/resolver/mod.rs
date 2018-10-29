@@ -12,6 +12,6 @@ const DNS_OPTIONS: DnsRequestOptions = DnsRequestOptions {
     expects_multiple_responses: false,
 };
 
-pub mod mix;
+pub mod mixed;
 pub mod tcp;
 pub mod udp;
