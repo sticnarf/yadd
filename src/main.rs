@@ -1,24 +1,15 @@
 #![feature(nll)]
 
-extern crate ipnet;
-extern crate iprange;
-extern crate lazy_static;
-extern crate lock_api;
-extern crate parking_lot;
-extern crate slog;
-extern crate sloggers;
-extern crate tokio;
-extern crate trust_dns;
-extern crate trust_dns_proto;
-extern crate trust_dns_server;
-
-use lazy_static::lazy_static;
 use crate::resolver::tcp::SimpleTcpResolver;
 use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
+
+use std::io;
+
+use lazy_static::lazy_static;
 use slog::Logger;
 use slog::{debug, error, info};
-use std::io;
+use tokio;
 use tokio::net::udp::UdpSocket;
 use tokio::prelude::*;
 use trust_dns::serialize::binary::{BinDecoder, BinEncodable};
@@ -26,6 +17,7 @@ use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::op::header::Header;
 use trust_dns_proto::op::header::MessageType;
 use trust_dns_proto::rr::RrsetRecords;
+use trust_dns_server;
 use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder, Queries};
 use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
 
@@ -49,7 +41,7 @@ impl ChinaDnsHandler {
 impl RequestHandler for ChinaDnsHandler {
     fn handle_request<R: ResponseHandler + 'static>(
         &self,
-        request: &Request,
+        request: &Request<'_>,
         response_handle: R,
     ) -> io::Result<()> {
         debug!(LOGGER, "Received request: {:?}", request.message);

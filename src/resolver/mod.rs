@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-use std::time::Duration;
 use tokio::prelude::*;
 use trust_dns::op::{DnsResponse, Query};
 use trust_dns_proto::error::ProtoError;

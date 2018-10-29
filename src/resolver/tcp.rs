@@ -2,13 +2,15 @@ use super::*;
 use crate::LOGGER;
 
 use self::ConnectionState::*;
-use lock_api::{RwLock, RwLockReadGuard};
-use parking_lot::RawRwLock;
-use slog::{debug, error, warn};
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
+
+use lock_api::{RwLock, RwLockReadGuard};
+use parking_lot::RawRwLock;
+use slog::{debug, error, warn};
 use tokio::timer::Delay;
 use trust_dns::client::{BasicClientHandle, ClientFuture};
 use trust_dns::tcp::TcpClientStream;

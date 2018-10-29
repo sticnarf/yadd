@@ -30,7 +30,7 @@ where
     C: Resolver,
     F: Resolver,
 {
-    type ResponseFuture = Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send>;
+    type ResponseFuture = Box<dyn Future<Item = DnsResponse, Error = ProtoError> + 'static + Send>;
 
     fn query(&mut self, _query: Query) -> Self::ResponseFuture {
         unimplemented!()

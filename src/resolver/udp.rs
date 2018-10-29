@@ -1,9 +1,10 @@
 use super::*;
 use crate::LOGGER;
 
-use slog::debug;
 use std::net::SocketAddr;
 use std::time::Duration;
+
+use slog::debug;
 use trust_dns::client::BasicClientHandle;
 use trust_dns::client::ClientFuture;
 use trust_dns::op::Query;
