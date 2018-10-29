@@ -1,5 +1,7 @@
 #![feature(nll)]
 
+extern crate ipnet;
+extern crate iprange;
 extern crate lazy_static;
 extern crate lock_api;
 extern crate parking_lot;
