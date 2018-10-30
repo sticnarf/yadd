@@ -1,5 +1,3 @@
-#![feature(nll)]
-
 use crate::resolver::mixed::MixedResolver;
 use crate::resolver::tcp::SimpleTcpResolver;
 use crate::resolver::udp::SimpleUdpResolver;
