@@ -169,7 +169,7 @@ fn main() {
 
 fn config() -> Result<Config, Error> {
     let matches = App::new("Yet Another DNS Dispatcher")
-        .version("0.1.0")
+        .version("0.1.0-dev")
         .author("Yilin Chen <sticnarf@gmail.com>")
         .arg(
             Arg::with_name("bind")
