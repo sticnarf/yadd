@@ -1,5 +1,5 @@
 [package]
-name = "chinadns-rust"
+name = "yadd"
 version = "0.1.0"
 authors = ["Yilin Chen <sticnarf@gmail.com>"]
 edition = "2018"
