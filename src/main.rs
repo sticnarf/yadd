@@ -177,7 +177,7 @@ fn config() -> Result<Config, Error> {
                 .short("b")
                 .takes_value(true)
                 .value_name("BIND_ADDR")
-                .default_value("127.0.0.1:53")
+                .default_value("127.0.0.1:5300")
                 .help("Address it listens on"),
         )
         .arg(
