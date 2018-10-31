@@ -1,5 +1,5 @@
 use super::*;
-use crate::LOGGER;
+use crate::STDOUT;
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -27,7 +27,7 @@ impl SimpleUdpResolver {
         let (stream, handle) = UdpClientStream::new(server_addr);
         let (bg, handle) = ClientFuture::with_timeout(stream, handle, timeout, None);
         debug!(
-            LOGGER,
+            STDOUT,
             "SimpleUdpResolver initialized. DNS requests are forwarded to {}.", server_addr
         );
         tokio::spawn(bg);

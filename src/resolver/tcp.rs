@@ -1,5 +1,5 @@
 use super::*;
-use crate::LOGGER;
+use crate::STDERR;
 
 use self::ConnectionState::*;
 
@@ -55,7 +55,7 @@ impl SimpleTcpResolver {
                 let (connect, handle) = TcpClientStream::new(server_addr);
                 let state = self.state.clone();
                 let stream = connect.map(move |stream| {
-                    debug!(LOGGER, "TCP connection to {} established.", server_addr);
+                    debug!(STDERR, "TCP connection to {} established.", server_addr);
                     let mut state = state.write();
                     match &mut *state {
                         Connecting(handle) => {
@@ -63,7 +63,7 @@ impl SimpleTcpResolver {
                         }
                         _ => {
                             warn!(
-                                LOGGER,
+                                STDERR,
                                 "Weird ConnectionState! Change it back to NotConnected"
                             );
                             *state = NotConnected;
@@ -78,7 +78,7 @@ impl SimpleTcpResolver {
 
                 let state = self.state.clone();
                 let bg = bg.and_then(move |()| {
-                    debug!(LOGGER, "TCP connection to {} closed", server_addr);
+                    debug!(STDERR, "TCP connection to {} closed", server_addr);
                     *state.write() = NotConnected;
                     future::empty()
                 });
@@ -134,11 +134,11 @@ impl Future for TcpResponse {
             .map(|resp_future| resp_future.poll())
         {
             Some(Ok(Async::Ready(resp))) => {
-                debug!(LOGGER, "TcpResponse ready.");
+                debug!(STDERR, "TcpResponse ready.");
                 Ok(Async::Ready(resp))
             }
             Some(Ok(Async::NotReady)) => {
-                debug!(LOGGER, "TcpResponse still not ready.");
+                debug!(STDERR, "TcpResponse still not ready.");
                 Ok(Async::NotReady)
             }
             Some(Err(e)) => {
@@ -147,7 +147,7 @@ impl Future for TcpResponse {
                     Connecting(_) => {
                         drop(state);
                         debug!(
-                            LOGGER,
+                            STDERR,
                             "Lookup error occurrs when connection is not established. Reset connection."
                         );
                         self.resp_future = None;
@@ -155,7 +155,7 @@ impl Future for TcpResponse {
                         Ok(Async::NotReady)
                     }
                     _ => {
-                        error!(LOGGER, "Lookup error: {}. Will retry.", e);
+                        error!(STDERR, "Lookup error: {}. Will retry.", e);
                         self.resp_future = None;
                         Ok(Async::NotReady)
                     }
@@ -165,7 +165,7 @@ impl Future for TcpResponse {
                 let mut state = self.resolver.state.read();
                 match &*state {
                     NotConnected => {
-                        debug!(LOGGER, "Not connected. Try to connect.");
+                        debug!(STDERR, "Not connected. Try to connect.");
                         RwLockReadGuard::unlocked(&mut state, || {
                             self.resolver.connect();
                         });
@@ -176,17 +176,17 @@ impl Future for TcpResponse {
                             handle.clone().lookup(self.query.clone(), DNS_OPTIONS);
                         match resp_future.poll() {
                             Ok(Async::Ready(resp)) => {
-                                warn!(LOGGER, "Immediately ready. Really?");
+                                warn!(STDERR, "Immediately ready. Really?");
                                 Ok(Async::Ready(resp))
                             }
                             Ok(Async::NotReady) => {
-                                debug!(LOGGER, "Not ready. Save it.");
+                                debug!(STDERR, "Not ready. Save it.");
                                 self.resp_future = Some(resp_future);
                                 Ok(Async::NotReady)
                             }
                             Err(e) => {
                                 use failure::Fail;
-                                error!(LOGGER, "Immediate lookup error: {:?}", e.backtrace());
+                                error!(STDERR, "Immediate lookup error: {:?}", e.backtrace());
                                 self.resp_future = None;
                                 Ok(Async::NotReady)
                             }

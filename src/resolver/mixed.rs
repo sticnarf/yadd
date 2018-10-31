@@ -1,5 +1,5 @@
 use super::*;
-use crate::LOGGER;
+use crate::{STDERR, STDOUT};
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -97,23 +97,23 @@ where
 
         let resolve_future = china_resolve.select(abroad_resolve).then(|res| match res {
             Ok(((china_resp, ResultSource::China), abroad_future)) => {
-                debug!(LOGGER, "Got china IP from server in china. Use it");
+                debug!(STDERR, "Got china IP from server in china. Use it");
                 // Ignore abroad future
                 let _ = tokio::spawn(abroad_future.map(|_| ()).map_err(|_| ()));
                 Box::new(future::ok(china_resp))
                     as Box<Future<Item = DnsResponse, Error = ProtoError> + Send>
             }
             Ok(((abroad_resp, ResultSource::Abroad), china_future)) => {
-                debug!(LOGGER, "IP from abroad got first.");
+                debug!(STDERR, "IP from abroad got first.");
                 Box::new(china_future.then(|res| match res {
                     Ok((china_resp, ResultSource::China)) => {
-                        debug!(LOGGER, "Got china IP from server in china. Use it");
+                        debug!(STDERR, "Got china IP from server in china. Use it");
                         Ok(china_resp)
                     }
                     Ok((_, ResultSource::Abroad)) => unreachable!(),
                     Err(_) => {
                         debug!(
-                            LOGGER,
+                            STDERR,
                             "Resolving from china server failed. Use ip from abroad"
                         );
                         Ok(abroad_resp)
@@ -121,11 +121,11 @@ where
                 }))
             }
             Err((e, other_future)) => {
-                debug!(LOGGER, "First query failed: {}", e);
+                debug!(STDERR, "First query failed: {}", e);
                 Box::new(other_future.map(|(resp, source)| {
                     match source {
-                        ResultSource::China => debug!(LOGGER, "Use ip from china"),
-                        ResultSource::Abroad => debug!(LOGGER, "Use ip from abroad"),
+                        ResultSource::China => debug!(STDERR, "Use ip from china"),
+                        ResultSource::Abroad => debug!(STDERR, "Use ip from abroad"),
                     }
                     resp
                 }))
