@@ -7,23 +7,23 @@ matrix:
     - rust: beta
       script:
       - cargo build --verbose; cargo test --verbose
+      before_deploy:
+        - cargo install cross
+        - cross build --release --target x86_64-unknown-linux-musl
+        - cross build --release --target i686-unknown-linux-musl
+        - cross build --release --target x86_64-pc-windows-gnu
+        - tar czf yadd-x86_64-linux-musl.tar.gz target/x86_64-unknown-linux-musl/release/yadd
+        - tar czf yadd-i686-linux-musl.tar.gz target/i686-unknown-linux-musl/release/yadd
+        - zip yadd-x86_64-windows-gnu.zip target/x86_64-pc-windows-gnu/release/yadd.exe
       deploy:
         provider: releases
         api_key:
           secure: dQaGDYlIgK6NRrjxtkc4YoMEHzbCEowbWu5gT7aEoRi0+i8qVjdB6/uknqRn4s4IYSln1NYQZGKsHXRJNgAYp5tcTdDeQM1xAoUIbNXxVCp+Ynv2yHXW0GhRXsUvkP3idVsnd1csIFYDYkH7zokdyhhr/PGFYT2QR0a4OC6lm+lFaYtvU8KzjsCBVHEn1UOxYhYLu/ONcsSh1zY+pJz0hGw53s86IkvA8jK+127sMoQKo5JTQ1MhyUxbrcnzw8ncJlTvCK01YNgz21LURvEWzZP5TLB68Gcu0+VLDndhTWKYHphMkDwjxvFnqEUH3bVWqwgFp2klhA45el2Ukv6QLvFZQ/9M2vf4vTDDPWlsE9lxohSdqMVm/j/b0KtmX7jvZ8sLBfXfEavcwtSG/g/zWZ7n7eCi0v6h5RGwfskFrOGKsELt6X4Vre+ewy55zBgB62lSqpB30EaJyJXUb6ORvripbeyxMzIIk2rmWfSmRbZYe8yxLnHYBlQVb+ECggnQEt1+IgSeT43IOZyhsES0AC0aDO0nVBOOj9SJySFUtL9hfyPv7xhCB6vHNq6QwsF/SNp1iFjzYJ3+gu+M9ydUQZsTlrmxF5bmNq/p+nqf8IdgU1XjlrdiL1OdAiKf3mfQRzCWWglJT8igMUhZi2oei7ZDoiKntPvF3ACkPk/WfGw=
         skip_cleanup: true
-        before_deploy:
-          - cargo install cross
-          - cross build --release --target x86_64-unknown-linux-musl
-          - cross build --release --target i686-unknown-linux-musl
-          - cross build --release --target x86_64-pc-windows-gnu
-          - tar czf yadd-x86_64-linux-musl.tar.gz target/x86_64-unknown-linux-musl/release/yadd
-          - tar czf yadd-i686-linux-musl.tar.gz target/i686-unknown-linux-musl/release/yadd
-          - zip yadd-x86_64-windows-gnu.zip target/x86_64-pc-windows-gnu/release/yadd.exe
         file: 
-          - yadd-x86_64-linux-musl.tar.gz
-          - yadd-i686-linux-gnu.tar.gz
-          - yadd-x86_64-windows-gnu.zip
+          - "yadd-x86_64-linux-musl.tar.gz"
+          - "yadd-i686-linux-gnu.tar.gz"
+          - "yadd-x86_64-windows-gnu.zip"
         on:
           tags: true
     - rust: nightly
