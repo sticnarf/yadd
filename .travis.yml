@@ -12,9 +12,9 @@ matrix:
         - cross build --release --target x86_64-unknown-linux-musl
         - cross build --release --target i686-unknown-linux-musl
         - cross build --release --target x86_64-pc-windows-gnu
-        - tar czf yadd-x86_64-linux-musl.tar.gz target/x86_64-unknown-linux-musl/release/yadd
-        - tar czf yadd-i686-linux-musl.tar.gz target/i686-unknown-linux-musl/release/yadd
-        - zip yadd-x86_64-windows-gnu.zip target/x86_64-pc-windows-gnu/release/yadd.exe
+        - cp target/x86_64-unknown-linux-musl/release/yadd ./yadd && tar czf yadd-x86_64-linux-musl.tar.gz ./yadd ./chnroutes.txt
+        - cp target/i686-unknown-linux-musl/release/yadd ./yadd && tar czf yadd-i686-linux-musl.tar.gz ./yadd ./chnroutes.txt
+        - cp target/x86_64-pc-windows-gnu/release/yadd.exe ./yadd.exe zip yadd-x86_64-windows-gnu.zip ./yadd.exe ./chnroutes.txt
       deploy:
         provider: releases
         api_key:
@@ -22,7 +22,7 @@ matrix:
         skip_cleanup: true
         file: 
           - "yadd-x86_64-linux-musl.tar.gz"
-          - "yadd-i686-linux-gnu.tar.gz"
+          - "yadd-i686-linux-musl.tar.gz"
           - "yadd-x86_64-windows-gnu.zip"
         on:
           tags: true
