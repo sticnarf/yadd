@@ -1,5 +1,6 @@
 sudo: required
 language: rust
+cache: cargo
 services:
 - docker
 matrix:
@@ -9,12 +10,12 @@ matrix:
       - cargo build --verbose; cargo test --verbose
       before_deploy:
         - cargo install cross
-        - cross build --release --target x86_64-unknown-linux-musl
-        - cross build --release --target i686-unknown-linux-musl
-        - cross build --release --target x86_64-pc-windows-gnu
+        - RUSTFLAGS="-C link-arg=-s" cross build --release --target x86_64-unknown-linux-musl
+        - RUSTFLAGS="-C link-arg=-s" cross build --release --target i686-unknown-linux-musl
+        - RUSTFLAGS="-C link-arg=-s" cross build --release --target x86_64-pc-windows-gnu
         - cp target/x86_64-unknown-linux-musl/release/yadd ./yadd && tar czf yadd-x86_64-linux-musl.tar.gz ./yadd ./chnroutes.txt
         - cp target/i686-unknown-linux-musl/release/yadd ./yadd && tar czf yadd-i686-linux-musl.tar.gz ./yadd ./chnroutes.txt
-        - cp target/x86_64-pc-windows-gnu/release/yadd.exe ./yadd.exe zip yadd-x86_64-windows-gnu.zip ./yadd.exe ./chnroutes.txt
+        - cp target/x86_64-pc-windows-gnu/release/yadd.exe ./yadd.exe && zip yadd-x86_64-windows-gnu.zip ./yadd.exe ./chnroutes.txt
       deploy:
         provider: releases
         api_key:
