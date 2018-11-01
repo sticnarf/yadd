@@ -1,13 +1,16 @@
+use std::fmt::Display;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+use std::net::SocketAddr;
+use std::path::Path;
+use std::process::exit;
+
+use crate::config::Config;
 use crate::resolver::mixed::MixedResolver;
 use crate::resolver::tcp::SimpleTcpResolver;
 use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
-
-use std::fmt::Display;
-use std::io;
-use std::net::SocketAddr;
-use std::path::Path;
-use std::process::exit;
 
 use clap::{App, Arg};
 use failure::Error;
@@ -141,30 +144,24 @@ impl<T, E: Display> ShouldSuccess for Result<T, E> {
     }
 }
 
-struct Config {
-    bind_addr: SocketAddr,
-    china_dns_addr: SocketAddr,
-    foreign_dns_addr: SocketAddr,
-    chnroutes_path: String,
-}
-
 fn main() {
     let conf = config().unwrap_or_log();
-    let bind = UdpSocket::bind(&conf.bind_addr)
-        .unwrap_or_log_with(format!("Unable to bind {}", conf.bind_addr));
-    info!(STDOUT, "Listening on UDP: {}", conf.bind_addr);
-    // trust_dns_server::logger::debug();
+    println!("{:?}", conf);
+    // let bind = UdpSocket::bind(&conf.bind_addr)
+    //     .unwrap_or_log_with(format!("Unable to bind {}", conf.bind_addr));
+    // info!(STDOUT, "Listening on UDP: {}", conf.bind_addr);
+    // // trust_dns_server::logger::debug();
 
-    let future = future::lazy(move || {
-        let china_resolver = SimpleUdpResolver::new(conf.china_dns_addr);
-        let foreign_resolver = SimpleUdpResolver::new(conf.foreign_dns_addr);
-        let resolver = ChinaDnsHandler::new(china_resolver, foreign_resolver, &conf.chnroutes_path);
-        let server = trust_dns_server::ServerFuture::new(resolver);
-        server.register_socket(bind);
-        future::empty()
-    });
+    // let future = future::lazy(move || {
+    //     let china_resolver = SimpleUdpResolver::new(conf.china_dns_addr);
+    //     let foreign_resolver = SimpleUdpResolver::new(conf.foreign_dns_addr);
+    //     let resolver = ChinaDnsHandler::new(china_resolver, foreign_resolver, &conf.chnroutes_path);
+    //     let server = trust_dns_server::ServerFuture::new(resolver);
+    //     server.register_socket(bind);
+    //     future::empty()
+    // });
 
-    tokio::run(future);
+    // tokio::run(future);
 }
 
 fn config() -> Result<Config, Error> {
@@ -172,64 +169,25 @@ fn config() -> Result<Config, Error> {
         .version("0.2.0-dev")
         .author("Yilin Chen <sticnarf@gmail.com>")
         .arg(
-            Arg::with_name("bind")
-                .long("bind")
-                .short("b")
+            Arg::with_name("config")
+                .long("conf")
+                .short("c")
                 .takes_value(true)
-                .value_name("BIND_ADDR")
-                .default_value("127.0.0.1:5300")
-                .help("Address it listens on"),
-        )
-        .arg(
-            Arg::with_name("china_dns")
-                .long("china")
-                .short("C")
-                .takes_value(true)
-                .value_name("CHINA_DNS")
-                .default_value("119.29.29.29:53")
-                .help("China DNS server"),
-        )
-        .arg(
-            Arg::with_name("foreign_dns")
-                .long("foreign")
-                .short("F")
-                .takes_value(true)
-                .value_name("FOREIGN_DNS")
-                .default_value("208.67.222.222:5353")
-                .help("Foreign DNS server"),
-        )
-        .arg(
-            Arg::with_name("chnroutes_file")
-                .long("chnroutes")
-                .short("r")
-                .takes_value(true)
-                .value_name("CHNROUTES_FILE")
-                .default_value("chnroutes.txt")
-                .help("Path to china routes file"),
+                .required(true)
+                .value_name("CONFIG_FILE")
+                .default_value("config.toml")
+                .help("Specify the config file"),
         )
         .get_matches();
-    let bind_addr = matches
-        .value_of("bind")
-        .expect("BIND_ADDR argument not found")
-        .parse()?;
-    let china_dns_addr = matches
-        .value_of("china_dns")
-        .expect("CHINA_DNS argument not found")
-        .parse()?;
-    let foreign_dns_addr = matches
-        .value_of("foreign_dns")
-        .expect("FOREIGN_DNS argument not found")
-        .parse()?;
-    let chnroutes_path = matches
-        .value_of("chnroutes_file")
-        .expect("CHNROUTES_FILE argument not found")
-        .to_owned();
-    Ok(Config {
-        bind_addr,
-        china_dns_addr,
-        foreign_dns_addr,
-        chnroutes_path,
-    })
+    let config_path = matches
+        .value_of("config")
+        .expect("CONFIG_FILE argument not found");
+    let mut file = File::open(config_path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+
+    let config = toml::from_str(&content)?;
+    Ok(config)
 }
 
 fn stdout_logger() -> Logger {
@@ -266,4 +224,5 @@ impl<T, E> Transpose for Option<Result<T, E>> {
     }
 }
 
+mod config;
 mod resolver;

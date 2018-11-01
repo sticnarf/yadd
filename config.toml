@@ -1,0 +1,19 @@
+bind = "127.0.0.1:5300"
+
+[resolvers]
+  [resolvers.dnspod]
+  address = "119.29.29.29:53"
+  network = "udp"
+
+  [resolvers.opendns]
+  address = "208.67.222.222:443"
+  network = "tcp"
+
+[ranges]
+  [ranges.cn]
+  file = "chnroutes.txt"
+
+[[rules]]
+resolvers = ["dnspod"]
+ranges = ["!cn"]
+action = "drop"
