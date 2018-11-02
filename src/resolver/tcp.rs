@@ -92,15 +92,16 @@ impl SimpleTcpResolver {
 }
 
 impl Resolver for SimpleTcpResolver {
-    type ResponseFuture = TcpResponse;
-
-    fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        TcpResponse {
+    fn query(
+        &mut self,
+        query: Query,
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
+        Box::new(TcpResponse {
             resolver: self.clone(),
             query,
             deadline: Delay::new(Instant::now() + self.timeout),
             resp_future: None,
-        }
+        })
     }
 }
 

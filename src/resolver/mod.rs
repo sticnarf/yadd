@@ -1,16 +1,28 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::ip::IpRange;
+
 use tokio::prelude::*;
 use trust_dns::op::{DnsResponse, Query};
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::xfer::DnsRequestOptions;
 
-pub trait Resolver: Clone + Send + Sync {
-    type ResponseFuture: Future<Item = DnsResponse, Error = ProtoError> + 'static + Send;
-    fn query(&mut self, query: Query) -> Self::ResponseFuture;
+pub trait Resolver: Send + Sync {
+    fn query(
+        &mut self,
+        query: Query,
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send>;
 }
 
 const DNS_OPTIONS: DnsRequestOptions = DnsRequestOptions {
     expects_multiple_responses: false,
 };
+
+pub struct DispatchingResolver {
+    resolvers: Arc<HashMap<String, Box<Resolver>>>,
+    ranges: Arc<HashMap<String, IpRange>>,
+}
 
 pub mod mixed;
 pub mod tcp;

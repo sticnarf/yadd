@@ -36,10 +36,11 @@ impl SimpleUdpResolver {
 }
 
 impl Resolver for SimpleUdpResolver {
-    type ResponseFuture = OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>;
-
-    fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        self.handle.lookup(query, DNS_OPTIONS)
+    fn query(
+        &mut self,
+        query: Query,
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
+        Box::new(self.handle.lookup(query, DNS_OPTIONS))
     }
 }
 

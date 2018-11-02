@@ -59,8 +59,8 @@ where
 
 impl<C, A> RequestHandler for ChinaDnsHandler<C, A>
 where
-    C: Resolver + 'static,
-    A: Resolver + 'static,
+    C: Resolver + Clone + 'static,
+    A: Resolver + Clone + 'static,
 {
     fn handle_request<R: ResponseHandler + 'static>(
         &self,
@@ -118,46 +118,13 @@ where
     }
 }
 
-trait ShouldSuccess {
-    type Item;
-
-    fn unwrap_or_log(self) -> Self::Item;
-
-    fn unwrap_or_log_with<D: Display>(self, description: D) -> Self::Item;
-}
-
-impl<T, F> ShouldSuccess for Result<T, F>
-where
-    F: Into<Error>,
-{
-    type Item = T;
-
-    fn unwrap_or_log(self) -> T {
-        self.unwrap_or_else(|e| {
-            let e: Error = e.into();
-            crit!(STDERR, "{}", e);
-            debug!(STDERR, "{:?}", e.backtrace());
-            exit(1);
-        })
-    }
-
-    fn unwrap_or_log_with<D: Display>(self, description: D) -> T {
-        self.unwrap_or_else(|e| {
-            let e: Error = e.into();
-            crit!(STDERR, "{}: {}", description, e);
-            debug!(STDERR, "{:?}", e.backtrace());
-            exit(1);
-        })
-    }
-}
-
 fn main() {
     let conf = config().unwrap_or_log();
     debug!(STDERR, "{:?}", conf);
 
     let bind =
         UdpSocket::bind(&conf.bind).unwrap_or_log_with(format!("Unable to bind to {}", conf.bind));
-    // info!(STDOUT, "Listening on UDP: {}", conf.bind_addr);
+    info!(STDOUT, "Listening on UDP: {}", conf.bind);
     // // trust_dns_server::logger::debug();
 
     // let future = future::lazy(move || {
@@ -212,6 +179,39 @@ fn stderr_logger() -> Logger {
     let drain = std::sync::Mutex::new(drain).fuse();
 
     Logger::root(drain, o!())
+}
+
+trait ShouldSuccess {
+    type Item;
+
+    fn unwrap_or_log(self) -> Self::Item;
+
+    fn unwrap_or_log_with<D: Display>(self, description: D) -> Self::Item;
+}
+
+impl<T, F> ShouldSuccess for Result<T, F>
+where
+    F: Into<Error>,
+{
+    type Item = T;
+
+    fn unwrap_or_log(self) -> T {
+        self.unwrap_or_else(|e| {
+            let e: Error = e.into();
+            crit!(STDERR, "{}", e);
+            debug!(STDERR, "{:?}", e.backtrace());
+            exit(1);
+        })
+    }
+
+    fn unwrap_or_log_with<D: Display>(self, description: D) -> T {
+        self.unwrap_or_else(|e| {
+            let e: Error = e.into();
+            crit!(STDERR, "{}: {}", description, e);
+            debug!(STDERR, "{:?}", e.backtrace());
+            exit(1);
+        })
+    }
 }
 
 // Wait for #47338 to be stable

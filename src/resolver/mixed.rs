@@ -75,12 +75,13 @@ fn is_china_response(resp: &DnsResponse, china_ip: Arc<IpRange<Ipv4Net>>) -> boo
 
 impl<C, F> Resolver for MixedResolver<C, F>
 where
-    C: Resolver,
-    F: Resolver,
+    C: Resolver + Clone,
+    F: Resolver + Clone,
 {
-    type ResponseFuture = Box<dyn Future<Item = DnsResponse, Error = ProtoError> + 'static + Send>;
-
-    fn query(&mut self, query: Query) -> Self::ResponseFuture {
+    fn query(
+        &mut self,
+        query: Query,
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
         let china_ip = self.china_ip.clone();
         let china_resolve = self.china.clone().query(query.clone()).and_then(|resp| {
             if is_china_response(&resp, china_ip) {

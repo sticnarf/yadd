@@ -3,12 +3,21 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use crate::ip::IpRange;
 
 use failure::Error;
 use ipnet::IpNet;
 use serde_derive::Deserialize;
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub bind: SocketAddr,
+    pub resolvers: Arc<HashMap<String, Resolver>>,
+    pub ranges: Arc<HashMap<String, IpRange>>,
+    pub rules: Arc<Vec<Rule>>,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigBuilder {
@@ -30,19 +39,11 @@ impl ConfigBuilder {
             .collect();
         Ok(Config {
             bind: self.bind,
-            resolvers: self.resolvers,
-            ranges: ranges?,
-            rules: self.rules,
+            resolvers: Arc::new(self.resolvers),
+            ranges: Arc::new(ranges?),
+            rules: Arc::new(self.rules),
         })
     }
-}
-
-#[derive(Debug)]
-pub struct Config {
-    pub bind: SocketAddr,
-    pub resolvers: HashMap<String, Resolver>,
-    pub ranges: HashMap<String, IpRange>,
-    pub rules: Vec<Rule>,
 }
 
 #[derive(Debug, Deserialize)]
