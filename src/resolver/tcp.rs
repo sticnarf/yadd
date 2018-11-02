@@ -92,15 +92,16 @@ impl SimpleTcpResolver {
 }
 
 impl Resolver for SimpleTcpResolver {
-    type ResponseFuture = TcpResponse;
-
-    fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        TcpResponse {
+    fn query(
+        &self,
+        query: Query,
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
+        Box::new(TcpResponse {
             resolver: self.clone(),
             query,
             deadline: Delay::new(Instant::now() + self.timeout),
             resp_future: None,
-        }
+        })
     }
 }
 
@@ -218,7 +219,7 @@ mod tests {
                 ))
             }))
             .unwrap();
-        let mut resolver2 = resolver.clone();
+        let resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =
@@ -236,7 +237,7 @@ mod tests {
 
         // Run a second time.
         // There once was a problem that the server would only respond to the first request.
-        let mut resolver2 = resolver.clone();
+        let resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =

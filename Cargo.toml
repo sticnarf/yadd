@@ -1,6 +1,6 @@
 [package]
 name = "yadd"
-version = "0.1.0"
+version = "0.2.0-dev"
 authors = ["Yilin Chen <sticnarf@gmail.com>"]
 edition = "2018"
 
@@ -15,11 +15,13 @@ slog-async = "2.3.0"
 lazy_static = "1.1.0"
 parking_lot = "0.6.4"
 lock_api = "0.1.4"
-iprange = "0.6.1"
+iprange = "0.6.2"
 ipnet = "2.0.0"
 failure = "0.1.3"
 clap = "2.23.0"
 toml = "0.4"
+serde = "1.0.80"
+serde_derive = "1.0.80"
 
 [patch."https://github.com/bluejekyll/trust-dns"]
 trust-dns-proto = { git = "https://github.com/sticnarf/trust-dns", branch = "generalize-rrset-records" }

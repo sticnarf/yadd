@@ -1,167 +1,39 @@
-use crate::resolver::mixed::MixedResolver;
-use crate::resolver::tcp::SimpleTcpResolver;
-use crate::resolver::udp::SimpleUdpResolver;
-use crate::resolver::Resolver;
-
 use std::fmt::Display;
-use std::io;
-use std::net::SocketAddr;
-use std::path::Path;
+use std::fs::File;
+use std::io::prelude::*;
 use std::process::exit;
+
+use crate::config::{Config, ConfigBuilder};
+use crate::dispatcher::Dispatcher;
 
 use clap::{App, Arg};
 use failure::Error;
 use lazy_static::lazy_static;
-use slog::{crit, debug, error, info};
+use slog::{crit, debug, info};
 use slog::{o, Drain, Logger};
 use tokio;
 use tokio::net::udp::UdpSocket;
 use tokio::prelude::*;
-use trust_dns::serialize::binary::{BinDecoder, BinEncodable};
-use trust_dns_proto::error::ProtoError;
-use trust_dns_proto::op::header::Header;
-use trust_dns_proto::op::header::MessageType;
-use trust_dns_proto::rr::RrsetRecords;
-use trust_dns_server;
-use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder, Queries};
-use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
 
 lazy_static! {
     static ref STDOUT: Logger = stdout_logger();
     static ref STDERR: Logger = stderr_logger();
 }
 
-struct ChinaDnsHandler<C, F>
-where
-    C: Resolver,
-    F: Resolver,
-{
-    mixed: MixedResolver<C, F>,
-}
-
-impl<C, F> ChinaDnsHandler<C, F>
-where
-    C: Resolver,
-    F: Resolver,
-{
-    fn new<P: AsRef<Path>>(
-        china_resolver: C,
-        foreign_resolver: F,
-        chnroutes_path: P,
-    ) -> ChinaDnsHandler<C, F> {
-        let mixed = MixedResolver::new(china_resolver, foreign_resolver, chnroutes_path).unwrap();
-        ChinaDnsHandler { mixed }
-    }
-}
-
-impl<C, A> RequestHandler for ChinaDnsHandler<C, A>
-where
-    C: Resolver + 'static,
-    A: Resolver + 'static,
-{
-    fn handle_request<R: ResponseHandler + 'static>(
-        &self,
-        request: &Request<'_>,
-        response_handle: R,
-    ) -> io::Result<()> {
-        debug!(STDERR, "Received request: {:?}", request.message);
-        let mut resolver = self.mixed.clone();
-        // We ignore all queries expect the first one.
-        // Although it is not standard conformant, it should just work in the real world.
-        let query = request
-            .message
-            .queries()
-            .iter()
-            .map(|q| q.original().clone())
-            .next();
-        let query_bytes = query.clone().map(|q| q.to_bytes());
-
-        let result_future =
-            future::lazy(move || query.map(move |q| resolver.query(q))).then(|res| match res {
-                Ok(resp) => Ok(resp),
-                Err(e) => {
-                    error!(STDERR, "Resolve error: {}", e);
-                    Ok(None)
-                }
-            });
-
-        // Build response header
-        let mut header = Header::new();
-        header.set_message_type(MessageType::Response);
-        header.set_id(request.message.id());
-
-        let send_future = result_future
-            .and_then(move |resp| {
-                // Copy the question section
-                let query_bytes = Transpose::transpose(query_bytes)?;
-                let queries = Transpose::transpose(query_bytes.as_ref().map(|bytes| {
-                    let mut decoder = BinDecoder::new(bytes);
-                    Queries::read(&mut decoder, 1)
-                }))?;
-                let mut builder = MessageResponseBuilder::new(queries.as_ref());
-                if let Some(ref resp) = resp {
-                    let answers = resp.answers();
-                    builder.answers(AuthLookup::Records(LookupRecords::RecordsIter(
-                        RrsetRecords::RecordsOnly(answers.iter()),
-                    )));
-                }
-                let message = builder.build(header);
-                Ok(response_handle.send_response(message)?)
-            })
-            .map_err(|e: ProtoError| error!(STDERR, "{}", e));
-
-        tokio::spawn(send_future);
-        Ok(())
-    }
-}
-
-trait ShouldSuccess {
-    type Item;
-
-    fn unwrap_or_log(self) -> Self::Item;
-
-    fn unwrap_or_log_with<D: Display>(self, description: D) -> Self::Item;
-}
-
-impl<T, E: Display> ShouldSuccess for Result<T, E> {
-    type Item = T;
-
-    fn unwrap_or_log(self) -> T {
-        self.unwrap_or_else(|e| {
-            crit!(STDERR, "{}", e);
-            exit(1);
-        })
-    }
-
-    fn unwrap_or_log_with<D: Display>(self, description: D) -> T {
-        self.unwrap_or_else(|e| {
-            crit!(STDERR, "{}: {}", description, e);
-            exit(1);
-        })
-    }
-}
-
-struct Config {
-    bind_addr: SocketAddr,
-    china_dns_addr: SocketAddr,
-    foreign_dns_addr: SocketAddr,
-    chnroutes_path: String,
-}
-
 fn main() {
     let conf = config().unwrap_or_log();
-    let bind = UdpSocket::bind(&conf.bind_addr)
-        .unwrap_or_log_with(format!("Unable to bind {}", conf.bind_addr));
-    info!(STDOUT, "Listening on UDP: {}", conf.bind_addr);
-    // trust_dns_server::logger::debug();
+    debug!(STDERR, "{:?}", conf);
+
+    let bind =
+        UdpSocket::bind(&conf.bind).unwrap_or_log_with(format!("Unable to bind to {}", conf.bind));
+    info!(STDOUT, "Listening on UDP: {}", conf.bind);
+    // // trust_dns_server::logger::debug();
 
     let future = future::lazy(move || {
-        let china_resolver = SimpleUdpResolver::new(conf.china_dns_addr);
-        let foreign_resolver = SimpleUdpResolver::new(conf.foreign_dns_addr);
-        let resolver = ChinaDnsHandler::new(china_resolver, foreign_resolver, &conf.chnroutes_path);
+        let resolver = Dispatcher::new(conf);
         let server = trust_dns_server::ServerFuture::new(resolver);
         server.register_socket(bind);
-        future::empty()
+        future::empty::<(), ()>()
     });
 
     tokio::run(future);
@@ -169,67 +41,28 @@ fn main() {
 
 fn config() -> Result<Config, Error> {
     let matches = App::new("Yet Another DNS Dispatcher")
-        .version("0.1.0")
+        .version("0.2.0-dev")
         .author("Yilin Chen <sticnarf@gmail.com>")
         .arg(
-            Arg::with_name("bind")
-                .long("bind")
-                .short("b")
+            Arg::with_name("config")
+                .long("conf")
+                .short("c")
                 .takes_value(true)
-                .value_name("BIND_ADDR")
-                .default_value("127.0.0.1:5300")
-                .help("Address it listens on"),
-        )
-        .arg(
-            Arg::with_name("china_dns")
-                .long("china")
-                .short("C")
-                .takes_value(true)
-                .value_name("CHINA_DNS")
-                .default_value("119.29.29.29:53")
-                .help("China DNS server"),
-        )
-        .arg(
-            Arg::with_name("foreign_dns")
-                .long("foreign")
-                .short("F")
-                .takes_value(true)
-                .value_name("FOREIGN_DNS")
-                .default_value("208.67.222.222:5353")
-                .help("Foreign DNS server"),
-        )
-        .arg(
-            Arg::with_name("chnroutes_file")
-                .long("chnroutes")
-                .short("r")
-                .takes_value(true)
-                .value_name("CHNROUTES_FILE")
-                .default_value("chnroutes.txt")
-                .help("Path to china routes file"),
+                .required(true)
+                .value_name("CONFIG_FILE")
+                .default_value("config.toml")
+                .help("Specify the config file"),
         )
         .get_matches();
-    let bind_addr = matches
-        .value_of("bind")
-        .expect("BIND_ADDR argument not found")
-        .parse()?;
-    let china_dns_addr = matches
-        .value_of("china_dns")
-        .expect("CHINA_DNS argument not found")
-        .parse()?;
-    let foreign_dns_addr = matches
-        .value_of("foreign_dns")
-        .expect("FOREIGN_DNS argument not found")
-        .parse()?;
-    let chnroutes_path = matches
-        .value_of("chnroutes_file")
-        .expect("CHNROUTES_FILE argument not found")
-        .to_owned();
-    Ok(Config {
-        bind_addr,
-        china_dns_addr,
-        foreign_dns_addr,
-        chnroutes_path,
-    })
+    let config_path = matches
+        .value_of("config")
+        .expect("CONFIG_FILE argument not found");
+    let mut file = File::open(config_path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+
+    let builder: ConfigBuilder = toml::from_str(&content)?;
+    builder.build()
 }
 
 fn stdout_logger() -> Logger {
@@ -246,6 +79,39 @@ fn stderr_logger() -> Logger {
     let drain = std::sync::Mutex::new(drain).fuse();
 
     Logger::root(drain, o!())
+}
+
+trait ShouldSuccess {
+    type Item;
+
+    fn unwrap_or_log(self) -> Self::Item;
+
+    fn unwrap_or_log_with<D: Display>(self, description: D) -> Self::Item;
+}
+
+impl<T, F> ShouldSuccess for Result<T, F>
+where
+    F: Into<Error>,
+{
+    type Item = T;
+
+    fn unwrap_or_log(self) -> T {
+        self.unwrap_or_else(|e| {
+            let e: Error = e.into();
+            crit!(STDERR, "{}", e);
+            debug!(STDERR, "{:?}", e.backtrace());
+            exit(1);
+        })
+    }
+
+    fn unwrap_or_log_with<D: Display>(self, description: D) -> T {
+        self.unwrap_or_else(|e| {
+            let e: Error = e.into();
+            crit!(STDERR, "{}: {}", description, e);
+            debug!(STDERR, "{:?}", e.backtrace());
+            exit(1);
+        })
+    }
 }
 
 // Wait for #47338 to be stable
@@ -266,4 +132,7 @@ impl<T, E> Transpose for Option<Result<T, E>> {
     }
 }
 
+mod config;
+mod dispatcher;
+mod ip;
 mod resolver;

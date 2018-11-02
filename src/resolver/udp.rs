@@ -11,7 +11,6 @@ use trust_dns::op::Query;
 use trust_dns::udp::UdpClientStream;
 use trust_dns_proto::xfer::dns_handle::DnsHandle;
 use trust_dns_proto::xfer::dns_multiplexer::DnsMultiplexerSerialResponse;
-use trust_dns_proto::xfer::OneshotDnsResponseReceiver;
 
 #[derive(Clone)]
 pub struct SimpleUdpResolver {
@@ -36,10 +35,11 @@ impl SimpleUdpResolver {
 }
 
 impl Resolver for SimpleUdpResolver {
-    type ResponseFuture = OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>;
-
-    fn query(&mut self, query: Query) -> Self::ResponseFuture {
-        self.handle.lookup(query, DNS_OPTIONS)
+    fn query(
+        &self,
+        query: Query,
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
+        Box::new(self.handle.clone().lookup(query, DNS_OPTIONS))
     }
 }
 
@@ -63,7 +63,7 @@ mod tests {
                 ))
             }))
             .unwrap();
-        let mut resolver2 = resolver.clone();
+        let resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =
@@ -81,7 +81,7 @@ mod tests {
 
         // Run a second time.
         // There once was a problem that the server would only respond to the first request.
-        let mut resolver2 = resolver.clone();
+        let resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =
