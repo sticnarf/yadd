@@ -63,7 +63,7 @@ mod tests {
                 ))
             }))
             .unwrap();
-        let mut resolver2 = resolver.clone();
+        let resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =
@@ -81,7 +81,7 @@ mod tests {
 
         // Run a second time.
         // There once was a problem that the server would only respond to the first request.
-        let mut resolver2 = resolver.clone();
+        let resolver2 = resolver.clone();
         let response = runtime
             .block_on(future::lazy(move || {
                 let query =

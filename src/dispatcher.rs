@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::config::{Config, NetworkType, ResolverConfig, Rule, RuleAction};
 use crate::ip::IpRange;
 use crate::resolver::{Resolver, SimpleTcpResolver, SimpleUdpResolver};
-use crate::{Transpose, STDERR, STDOUT};
+use crate::{Transpose, STDERR};
 
 use slog::{debug, error};
 use tokio::prelude::*;
@@ -113,6 +113,7 @@ impl Resolver for Dispatcher {
                     RuleAction::Accept => {
                         // Ignore the remaining future
                         tokio::spawn(future::join_all(remaining).map(|_| ()).map_err(|_| ()));
+                        debug!(STDERR, "Use result from {}", name);
                         Box::new(future::ok(resp))
                     }
                     RuleAction::Drop => process_all(dispatcher, future::select_all(remaining)),
