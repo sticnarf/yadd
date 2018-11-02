@@ -126,11 +126,15 @@ trait ShouldSuccess {
     fn unwrap_or_log_with<D: Display>(self, description: D) -> Self::Item;
 }
 
-impl<T> ShouldSuccess for Result<T, Error> {
+impl<T, F> ShouldSuccess for Result<T, F>
+where
+    F: Into<Error>,
+{
     type Item = T;
 
     fn unwrap_or_log(self) -> T {
         self.unwrap_or_else(|e| {
+            let e: Error = e.into();
             crit!(STDERR, "{}", e);
             debug!(STDERR, "{:?}", e.backtrace());
             exit(1);
@@ -139,6 +143,7 @@ impl<T> ShouldSuccess for Result<T, Error> {
 
     fn unwrap_or_log_with<D: Display>(self, description: D) -> T {
         self.unwrap_or_else(|e| {
+            let e: Error = e.into();
             crit!(STDERR, "{}: {}", description, e);
             debug!(STDERR, "{:?}", e.backtrace());
             exit(1);
@@ -148,9 +153,10 @@ impl<T> ShouldSuccess for Result<T, Error> {
 
 fn main() {
     let conf = config().unwrap_or_log();
-    println!("{:?}", conf);
-    // let bind = UdpSocket::bind(&conf.bind_addr)
-    //     .unwrap_or_log_with(format!("Unable to bind {}", conf.bind_addr));
+    debug!(STDERR, "{:?}", conf);
+
+    let bind =
+        UdpSocket::bind(&conf.bind).unwrap_or_log_with(format!("Unable to bind to {}", conf.bind));
     // info!(STDOUT, "Listening on UDP: {}", conf.bind_addr);
     // // trust_dns_server::logger::debug();
 

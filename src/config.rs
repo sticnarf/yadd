@@ -39,10 +39,10 @@ impl ConfigBuilder {
 
 #[derive(Debug)]
 pub struct Config {
-    bind: SocketAddr,
-    resolvers: HashMap<String, Resolver>,
-    ranges: HashMap<String, IpRange>,
-    rules: Vec<Rule>,
+    pub bind: SocketAddr,
+    pub resolvers: HashMap<String, Resolver>,
+    pub ranges: HashMap<String, IpRange>,
+    pub rules: Vec<Rule>,
 }
 
 #[derive(Debug, Deserialize)]
