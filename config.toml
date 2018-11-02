@@ -11,7 +11,7 @@ bind = "127.0.0.1:5300"
 
 [ranges]
   [ranges.cn]
-  file = "chnroutes.txt"
+  file = ["chnroutes.txt"]
 
 [[rules]]
 resolvers = ["dnspod"]

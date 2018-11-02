@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::process::exit;
 
-use crate::config::Config;
+use crate::config::{Config, ConfigBuilder};
 use crate::resolver::mixed::MixedResolver;
 use crate::resolver::tcp::SimpleTcpResolver;
 use crate::resolver::udp::SimpleUdpResolver;
@@ -186,8 +186,8 @@ fn config() -> Result<Config, Error> {
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    let config = toml::from_str(&content)?;
-    Ok(config)
+    let builder: ConfigBuilder = toml::from_str(&content)?;
+    builder.build()
 }
 
 fn stdout_logger() -> Logger {
@@ -225,4 +225,5 @@ impl<T, E> Transpose for Option<Result<T, E>> {
 }
 
 mod config;
+mod ip;
 mod resolver;

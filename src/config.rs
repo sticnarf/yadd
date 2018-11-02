@@ -1,13 +1,40 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
+use crate::ip::IpRange;
+
+use failure::Error;
 use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct ConfigBuilder {
     bind: SocketAddr,
     resolvers: HashMap<String, Resolver>,
     ranges: HashMap<String, IpRangeConf>,
+    rules: Vec<Rule>,
+}
+
+impl ConfigBuilder {
+    pub fn build(self) -> Result<Config, Error> {
+        let ranges: HashMap<String, IpRange> = self
+            .ranges
+            .into_iter()
+            .map(|(key, conf)| unimplemented!())
+            .collect();
+        Ok(Config {
+            bind: self.bind,
+            resolvers: self.resolvers,
+            ranges,
+            rules: self.rules,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct Config {
+    bind: SocketAddr,
+    resolvers: HashMap<String, Resolver>,
+    ranges: HashMap<String, IpRange>,
     rules: Vec<Rule>,
 }
 
@@ -26,8 +53,8 @@ pub enum NetworkType {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct IpRangeConf {
-    file: Option<String>,
+struct IpRangeConf {
+    file: Option<Vec<String>>,
     list: Option<Vec<SocketAddr>>,
 }
 
