@@ -11,7 +11,6 @@ use trust_dns::op::Query;
 use trust_dns::udp::UdpClientStream;
 use trust_dns_proto::xfer::dns_handle::DnsHandle;
 use trust_dns_proto::xfer::dns_multiplexer::DnsMultiplexerSerialResponse;
-use trust_dns_proto::xfer::OneshotDnsResponseReceiver;
 
 #[derive(Clone)]
 pub struct SimpleUdpResolver {
@@ -37,10 +36,10 @@ impl SimpleUdpResolver {
 
 impl Resolver for SimpleUdpResolver {
     fn query(
-        &mut self,
+        &self,
         query: Query,
     ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
-        Box::new(self.handle.lookup(query, DNS_OPTIONS))
+        Box::new(self.handle.clone().lookup(query, DNS_OPTIONS))
     }
 }
 

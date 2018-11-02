@@ -98,13 +98,15 @@ impl IpRangeConf {
 
 #[derive(Debug, Deserialize)]
 pub struct Rule {
-    resolvers: Vec<String>,
-    ranges: Vec<String>,
-    action: RuleAction,
+    pub resolvers: Vec<String>,
+    pub ranges: Vec<String>,
+    pub action: RuleAction,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 pub enum RuleAction {
+    #[serde(rename = "accept")]
+    Accept,
     #[serde(rename = "drop")]
     Drop,
 }

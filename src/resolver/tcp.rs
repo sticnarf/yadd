@@ -93,7 +93,7 @@ impl SimpleTcpResolver {
 
 impl Resolver for SimpleTcpResolver {
     fn query(
-        &mut self,
+        &self,
         query: Query,
     ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
         Box::new(TcpResponse {
