@@ -14,7 +14,7 @@ use serde_derive::Deserialize;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub bind: SocketAddr,
-    pub resolvers: Arc<HashMap<String, Resolver>>,
+    pub resolvers: Arc<HashMap<String, ResolverConfig>>,
     pub ranges: Arc<HashMap<String, IpRange>>,
     pub rules: Arc<Vec<Rule>>,
 }
@@ -22,7 +22,7 @@ pub struct Config {
 #[derive(Debug, Deserialize)]
 pub struct ConfigBuilder {
     bind: SocketAddr,
-    resolvers: HashMap<String, Resolver>,
+    resolvers: HashMap<String, ResolverConfig>,
     ranges: HashMap<String, IpRangeConf>,
     rules: Vec<Rule>,
 }
@@ -47,9 +47,9 @@ impl ConfigBuilder {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Resolver {
-    address: SocketAddr,
-    network: NetworkType,
+pub struct ResolverConfig {
+    pub address: SocketAddr,
+    pub network: NetworkType,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use crate::ip::IpRange;
-
 use tokio::prelude::*;
 use trust_dns::op::{DnsResponse, Query};
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::xfer::DnsRequestOptions;
+
+pub use self::tcp::SimpleTcpResolver;
+pub use self::udp::SimpleUdpResolver;
 
 pub trait Resolver: Send + Sync {
     fn query(
@@ -18,11 +16,6 @@ pub trait Resolver: Send + Sync {
 const DNS_OPTIONS: DnsRequestOptions = DnsRequestOptions {
     expects_multiple_responses: false,
 };
-
-pub struct DispatchingResolver {
-    resolvers: Arc<HashMap<String, Box<Resolver>>>,
-    ranges: Arc<HashMap<String, IpRange>>,
-}
 
 pub mod mixed;
 pub mod tcp;
