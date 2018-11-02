@@ -13,7 +13,7 @@ use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
 
 use clap::{App, Arg};
-use failure::Error;
+use failure::{Error, Fail};
 use lazy_static::lazy_static;
 use slog::{crit, debug, error, info};
 use slog::{o, Drain, Logger};
@@ -126,12 +126,13 @@ trait ShouldSuccess {
     fn unwrap_or_log_with<D: Display>(self, description: D) -> Self::Item;
 }
 
-impl<T, E: Display> ShouldSuccess for Result<T, E> {
+impl<T> ShouldSuccess for Result<T, Error> {
     type Item = T;
 
     fn unwrap_or_log(self) -> T {
         self.unwrap_or_else(|e| {
             crit!(STDERR, "{}", e);
+            debug!(STDERR, "{:?}", e.backtrace());
             exit(1);
         })
     }
@@ -139,6 +140,7 @@ impl<T, E: Display> ShouldSuccess for Result<T, E> {
     fn unwrap_or_log_with<D: Display>(self, description: D) -> T {
         self.unwrap_or_else(|e| {
             crit!(STDERR, "{}: {}", description, e);
+            debug!(STDERR, "{:?}", e.backtrace());
             exit(1);
         })
     }
