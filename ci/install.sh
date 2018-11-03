@@ -57,10 +57,14 @@ main() {
 
     cargo install --git https://github.com/rust-embedded/cross --force
 
-    cd $tmp
-    git clone https://github.com/rust-embedded/cross.git
-    cd cross
-    sh build-docker-image.sh $TARGET
+    if [ $TRAVIS_OS_NAME = linux ]; then
+        cd $tmp
+        git clone https://github.com/rust-embedded/cross.git
+        cd cross
+        sh build-docker-image.sh $TARGET
+    fi
+    
+    cd $src
 }
 
 main

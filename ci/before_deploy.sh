@@ -18,7 +18,7 @@ main() {
     test -f Cargo.lock || cargo generate-lockfile
 
     # TODO Update this to build the artifacts that matter to you
-    RUSTFLAGS="-C link-arg=-s" cross build --target $TARGET --release
+    RUSTFLAGS="$RUSTFLAGS -C link-arg=-s" cross build --target $TARGET --release
 
     # TODO Update this to package the right artifacts
     cp target/$TARGET/release/yadd $stage/
