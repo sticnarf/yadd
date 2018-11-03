@@ -55,7 +55,7 @@ main() {
             ;;
     esac
 
-    cargo install --git https://github.com/rust-embedded/cross
+    cargo install --git https://github.com/rust-embedded/cross --force
 
     cd $tmp
     git clone https://github.com/rust-embedded/cross.git
