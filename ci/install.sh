@@ -42,7 +42,25 @@ main() {
     #        --git japaric/cross \
     #        --tag $tag \
     #        --target $target
+
+    local src=$(pwd) \
+          tmp=
+
+    case $TRAVIS_OS_NAME in
+        linux)
+            tmp=$(mktemp -d)
+            ;;
+        osx)
+            tmp=$(mktemp -d -t tmp)
+            ;;
+    esac
+
     cargo install --git https://github.com/rust-embedded/cross
+
+    cd $tmp
+    git clone https://github.com/rust-embedded/cross.git
+    cd cross
+    sh build-docker-image.sh $TARGET
 }
 
 main
