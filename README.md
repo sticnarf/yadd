@@ -47,7 +47,7 @@ Pay attention that root privilege may be required if you specifies a port below 
   network = "udp"
 ```
 
-You set up the remote resolvers here.
+You set up the remote resolvers here. DNS queries will be forwarded to all the servers set up here.
 
 The `dnspod` and `opendns` after `resolvers.` are the names of the resolvers. They will be used later in your rules.
 
