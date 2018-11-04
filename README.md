@@ -20,7 +20,7 @@ Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. O
 
 ## Configuration
 
-**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following maybe terribly long documentation.**
+**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following possibly terribly long documentation.**
 
 Belows are the detailed explanations for `config.toml` and how you can customize it, part by part.
 
@@ -87,6 +87,8 @@ You can use the two ways at the same time. Here is an example:
   files = ["chnroutes.txt"]
   list = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 ```
+
+Of course, IPv6 CIDRs are supported as well. Feel free to mix IPv4 subnets and IPv6 subnets in a single range. Yadd takes good care of them.
 
 ### Rules
 
