@@ -36,7 +36,7 @@ pub enum ConnectionState {
 
 impl SimpleTcpResolver {
     pub fn new(server_addr: SocketAddr) -> Self {
-        Self::with_timeout(server_addr, Duration::from_secs(2))
+        Self::with_timeout(server_addr, Duration::from_secs(5))
     }
 
     pub fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
@@ -52,7 +52,8 @@ impl SimpleTcpResolver {
         match &*state_ref {
             NotConnected => {
                 let server_addr = self.server_addr;
-                let (connect, handle) = TcpClientStream::new(server_addr);
+                let (connect, handle) =
+                    TcpClientStream::with_timeout(server_addr, self.timeout / 2);
                 let state = self.state.clone();
                 let stream = connect.map(move |stream| {
                     debug!(STDERR, "TCP connection to {} established.", server_addr);
@@ -153,11 +154,13 @@ impl Future for TcpResponse {
                         );
                         self.resp_future = None;
                         *self.resolver.state.write() = NotConnected;
+                        task::current().notify();
                         Ok(Async::NotReady)
                     }
                     _ => {
                         error!(STDERR, "Lookup error: {}. Will retry.", e);
                         self.resp_future = None;
+                        task::current().notify();
                         Ok(Async::NotReady)
                     }
                 }
