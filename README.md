@@ -16,9 +16,9 @@ Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. O
 
 ## Configuration
 
-Yadd has high flexibility.
+**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following terribly long documentation.**
 
-Belows are explanations for `config.toml` and how you can customize it, part by part.
+Belows are the detailed explanations for `config.toml` and how you can customize it, part by part.
 
 ### Global settings
 
