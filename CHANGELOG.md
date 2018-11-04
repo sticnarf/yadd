@@ -1,7 +1,7 @@
 # 0.2.0
 
 * Use config file instead of command line arguments.
-* Support TCP.
+* Support TCP upstream servers.
 * Support any number of upstream servers.
 * Support customizing rules.
 
