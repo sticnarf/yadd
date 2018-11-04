@@ -61,7 +61,7 @@ main() {
         cd $tmp
         git clone https://github.com/rust-embedded/cross.git
         cd cross
-        sh build-docker-image.sh $TARGET
+        TRAVIS_TAG="" sh build-docker-image.sh $TARGET
     fi
     
     cd $src
