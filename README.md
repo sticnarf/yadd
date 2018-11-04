@@ -6,7 +6,7 @@ Yadd (**Y**et **A**nother **D**NS **D**ispatcher) forwards DNS queries to multip
 
 It aims to be fast and flexible but yet easy to use.
 
-Prebuilt releases are available [here](https://github.com/sticnarf/yadd/releases). Please switch to the corresponding tag before going on.
+Prebuilt releases are available [here](https://github.com/sticnarf/yadd/releases). Because the README in the master branch may be newer than the release you use, please switch to the corresponding git tag before going on reading.
 
 ## ChinaDNS
 
@@ -105,9 +105,7 @@ Rules are how yadd deals with the responses. If the response is from the specifi
 
 The `ranges` array can contain range names as well as the original range name with a leading `!` for inversion. For instance, `!cn` matches all IP addresses which are not in the `cn` range.
 
-The only effective option for `action` attribute now is `drop`. The first response not dropped is adopted and returned to the client.
-
-More options will be added in later versions.
+The only effective option for `action` attribute now is `drop`. The first response not dropped is adopted and returned to the client. More options will be added in later versions.
 
 ## Build
 
