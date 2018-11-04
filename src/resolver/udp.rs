@@ -19,7 +19,7 @@ pub struct SimpleUdpResolver {
 
 impl SimpleUdpResolver {
     pub fn new(server_addr: SocketAddr) -> Self {
-        Self::with_timeout(server_addr, Duration::from_secs(2))
+        Self::with_timeout(server_addr, Duration::from_secs(5))
     }
 
     pub fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {

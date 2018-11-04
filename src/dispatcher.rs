@@ -120,7 +120,11 @@ impl Resolver for Dispatcher {
                 },
                 Err(((name, e), _, remaining)) => {
                     error!(STDERR, "{}: {}", name, e);
-                    process_all(dispatcher, future::select_all(remaining))
+                    if remaining.len() > 0 {
+                        process_all(dispatcher, future::select_all(remaining))
+                    } else {
+                        Box::new(future::err(e))
+                    }
                 }
             }))
         }

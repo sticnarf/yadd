@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::ip::IpRange;
 
-use failure::Error;
+use failure::{err_msg, Error};
 use ipnet::IpNet;
 use serde_derive::Deserialize;
 
@@ -29,6 +29,9 @@ pub struct ConfigBuilder {
 
 impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Error> {
+        if self.upstreams.is_empty() {
+            return Err(err_msg("You must configure at least one upstream server!"));
+        }
         let ranges: Result<HashMap<String, IpRange>, Error> = self
             .ranges
             .into_iter()
