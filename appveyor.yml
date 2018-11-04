@@ -53,7 +53,7 @@ test_script:
 before_deploy:
   # TODO Update this to build the artifacts that matter to you
   - setx RUSTFLAGS "-C link-arg=-s"
-  - cargo build --target %TARGET%
+  - cargo build --target %TARGET% --release
   - ps: ci\before_deploy.ps1
 
 deploy:
