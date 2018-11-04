@@ -9,10 +9,6 @@ bind = "127.0.0.1:5300"
   address = "223.5.5.5:53"
   network = "udp"
 
-  [resolvers.google]
-  address = "[2001:4860:4860::8888]:53"
-  network = "tcp"
-
   [resolvers.opendns]
   address = "208.67.222.222:5353"
   network = "udp"
