@@ -1,8 +1,12 @@
-# yadd [![Build Status](https://travis-ci.org/sticnarf/yadd.svg?branch=master)](https://travis-ci.org/sticnarf/yadd) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/sticnarf/yadd?branch=master&svg=true)](https://ci.appveyor.com/project/sticnarf/yadd)
+# yadd
+
+[![Build Status](https://travis-ci.org/sticnarf/yadd.svg?branch=master)](https://travis-ci.org/sticnarf/yadd) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/sticnarf/yadd?branch=master&svg=true)](https://ci.appveyor.com/project/sticnarf/yadd)
 
 Yadd (**Y**et **A**nother **D**NS **D**ispatcher) forwards DNS queries to multiple servers at the same time and decides which result to return by custom rules.
 
 It aims to be fast and flexible but yet easy to use.
+
+Prebuilt releases are available [here](https://github.com/sticnarf/yadd/releases). Please switch to the corresponding tag before going on.
 
 ## ChinaDNS
 
@@ -16,7 +20,7 @@ Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. O
 
 ## Configuration
 
-**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following terribly long documentation.**
+**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following maybe terribly long documentation.**
 
 Belows are the detailed explanations for `config.toml` and how you can customize it, part by part.
 
