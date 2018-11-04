@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
-use crate::config::{Config, NetworkType, ResolverConfig, Rule, RuleAction};
+use crate::config::{Config, NetworkType, Rule, RuleAction, UpstreamConfig};
 use crate::ip::IpRange;
 use crate::resolver::{Resolver, SimpleTcpResolver, SimpleUdpResolver};
 use crate::{Transpose, STDERR};
@@ -29,9 +29,9 @@ pub struct Dispatcher {
 impl Dispatcher {
     pub fn new(config: Config) -> Self {
         let resolvers: HashMap<_, _> = config
-            .resolvers
+            .upstreams
             .iter()
-            .map(|(name, ResolverConfig { address, network })| {
+            .map(|(name, UpstreamConfig { address, network })| {
                 (
                     name.to_owned(),
                     match network {
@@ -54,7 +54,7 @@ impl Dispatcher {
     fn check_response(&self, name: &str, resp: &DnsResponse) -> RuleAction {
         let answers = resp.answers();
         for rule in &*self.rules {
-            if rule.resolvers.iter().any(|s| s == name) {
+            if rule.upstreams.iter().any(|s| s == name) {
                 let is_match = rule.ranges.iter().any(|range_pattern| {
                     let range_name = range_pattern.trim_start_matches('!');
                     let toggle = (range_pattern.len() - range_name.len()) % 2 == 1;

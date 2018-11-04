@@ -1,8 +1,12 @@
-# yadd [![Build Status](https://travis-ci.org/sticnarf/yadd.svg?branch=master)](https://travis-ci.org/sticnarf/yadd) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/sticnarf/yadd?branch=master&svg=true)](https://ci.appveyor.com/project/sticnarf/yadd)
+# yadd
+
+[![Build Status](https://travis-ci.org/sticnarf/yadd.svg?branch=master)](https://travis-ci.org/sticnarf/yadd) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/sticnarf/yadd?branch=master&svg=true)](https://ci.appveyor.com/project/sticnarf/yadd)
 
 Yadd (**Y**et **A**nother **D**NS **D**ispatcher) forwards DNS queries to multiple servers at the same time and decides which result to return by custom rules.
 
 It aims to be fast and flexible but yet easy to use.
+
+Prebuilt releases are available [here](https://github.com/sticnarf/yadd/releases). Please switch to the corresponding tag before going on.
 
 ## ChinaDNS
 
@@ -16,9 +20,9 @@ Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. O
 
 ## Configuration
 
-Yadd has high flexibility.
+**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following possibly terribly long documentation.**
 
-Belows are explanations for `config.toml` and how you can customize it, part by part.
+Belows are the detailed explanations for `config.toml` and how you can customize it, part by part.
 
 ### Global settings
 
@@ -30,26 +34,26 @@ It is the address that yadd listens on. Feel free to change it based on your nee
 
 Pay attention that root privilege may be required if you specifies a port below 1024.
 
-### Resolvers
+### Upstreams
 
 ```toml
-[resolvers]
-  [resolvers.dnspod]
+[upstreams]
+  [upstreams.dnspod]
   address = "119.29.29.29:53"
   network = "udp"
 
-  [resolvers.alidns]
+  [upstreams.alidns]
   address = "223.5.5.5:53"
   network = "udp"
 
-  [resolvers.opendns]
+  [upstreams.opendns]
   address = "208.67.222.222:5353"
   network = "udp"
 ```
 
-You set up the remote resolvers here.
+Set up the upstream servers here. DNS queries will be forwarded to all the servers set up here.
 
-The `dnspod` and `opendns` after `resolvers.` are the names of the resolvers. They will be used later in your rules.
+The `dnspod` and `opendns` after `upstreams.` are the names of the upstream servers. They will be used later in your rules.
 
 You must specify the port in the `address` attribute, even if it uses the standard port `53`. IPv6 is supported here, for example, you can write `address = "[2001:4860:4860::8888]:53"`.
 
@@ -67,7 +71,7 @@ Multiplexing is enabled for TCP connections. This means no second connection wil
 
 Set up the IP ranges you want to use later in your rules here.
 
-Like resolvers, the `cn` after `ranges.` is the name of the range.
+Like upstreams, the `cn` after `ranges.` is the name of the range.
 
 A `range` supports two ways of configuration.
 
@@ -84,18 +88,20 @@ You can use the two ways at the same time. Here is an example:
   list = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 ```
 
+Of course, IPv6 CIDRs are supported as well. Feel free to mix IPv4 subnets and IPv6 subnets in a single range. Yadd takes good care of them.
+
 ### Rules
 
 ```toml
 [[rules]]
-resolvers = ["dnspod", "alidns"]
+upstreams = ["dnspod", "alidns"]
 ranges = ["!cn"]
 action = "drop"
 ```
 
-Rules are how yadd deals with the responses. If the response is from the specified `resolvers` **and** the response IP is in the `ranges`, yadd will do the corresponding `action`.
+Rules are how yadd deals with the responses. If the response is from the specified `upstreams` **and** the response IP is in the `ranges`, yadd will do the corresponding `action`.
 
-`resolvers` is an array of resolver names which are defined in the resolvers section.
+`upstreams` is an array of upstream server names which are defined in the upstreams section.
 
 The `ranges` array can contain range names as well as the original range name with a leading `!` for inversion. For instance, `!cn` matches all IP addresses which are not in the `cn` range.
 
