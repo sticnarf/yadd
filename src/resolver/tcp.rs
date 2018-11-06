@@ -11,21 +11,57 @@ use std::time::Instant;
 use lock_api::{RwLock, RwLockReadGuard};
 use parking_lot::RawRwLock;
 use slog::{debug, error, warn};
+use std::marker::PhantomData;
 use tokio::timer::Delay;
+use trust_dns::client::ClientStreamHandle;
 use trust_dns::client::{BasicClientHandle, ClientFuture};
 use trust_dns::tcp::TcpClientStream;
+use trust_dns_native_tls::tls_client_stream::TlsClientStreamBuilder;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::error::ProtoErrorKind;
 use trust_dns_proto::op::Query;
+use trust_dns_proto::tcp::TcpClientConnect;
 use trust_dns_proto::xfer::dns_handle::DnsHandle;
+use trust_dns_proto::xfer::DnsClientStream;
 use trust_dns_proto::xfer::DnsResponse;
 use trust_dns_proto::xfer::{DnsMultiplexerSerialResponse, OneshotDnsResponseReceiver};
 
-#[derive(Clone)]
-pub struct SimpleTcpResolver {
+pub trait TcpDnsStream: Sync + Send + 'static {
+    type Connect: Future<Item = Self::Stream, Error = ProtoError> + Send;
+    type Stream: DnsClientStream + Sync + Send + 'static;
+    fn with_timeout(
+        name_server: SocketAddr,
+        timeout: Duration,
+    ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>);
+}
+
+impl TcpDnsStream for TcpClientStream<tokio_tcp::TcpStream> {
+    type Connect = TcpClientConnect;
+    type Stream = TcpClientStream<tokio_tcp::TcpStream>;
+    fn with_timeout(
+        name_server: SocketAddr,
+        timeout: Duration,
+    ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>) {
+        TcpClientStream::with_timeout(name_server, timeout)
+    }
+}
+
+pub struct TcpResolver<S: TcpDnsStream> {
     server_addr: SocketAddr,
     timeout: Duration,
     state: Arc<RwLock<RawRwLock, ConnectionState>>,
+    phantom: PhantomData<S>,
+}
+
+impl<S: TcpDnsStream> Clone for TcpResolver<S> {
+    fn clone(&self) -> Self {
+        TcpResolver {
+            server_addr: self.server_addr,
+            timeout: self.timeout,
+            state: self.state.clone(),
+            phantom: PhantomData,
+        }
+    }
 }
 
 pub enum ConnectionState {
@@ -34,16 +70,17 @@ pub enum ConnectionState {
     Connected(BasicClientHandle<DnsMultiplexerSerialResponse>),
 }
 
-impl SimpleTcpResolver {
+impl<S: TcpDnsStream> TcpResolver<S> {
     pub fn new(server_addr: SocketAddr) -> Self {
         Self::with_timeout(server_addr, Duration::from_secs(5))
     }
 
     pub fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
-        SimpleTcpResolver {
+        TcpResolver {
             server_addr,
             timeout,
             state: Arc::new(RwLock::new(NotConnected)),
+            phantom: PhantomData,
         }
     }
 
@@ -52,8 +89,7 @@ impl SimpleTcpResolver {
         match &*state_ref {
             NotConnected => {
                 let server_addr = self.server_addr;
-                let (connect, handle) =
-                    TcpClientStream::with_timeout(server_addr, self.timeout / 2);
+                let (connect, handle) = S::with_timeout(server_addr, self.timeout / 2);
                 let state = self.state.clone();
                 let stream = connect.map(move |stream| {
                     debug!(STDERR, "TCP connection to {} established.", server_addr);
@@ -92,13 +128,14 @@ impl SimpleTcpResolver {
     }
 }
 
-impl Resolver for SimpleTcpResolver {
+impl<S: TcpDnsStream> Resolver for TcpResolver<S> {
     fn query(
         &self,
         query: Query,
     ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
+        let resolver: Self = self.clone();
         Box::new(TcpResponse {
-            resolver: self.clone(),
+            resolver,
             query,
             deadline: Delay::new(Instant::now() + self.timeout),
             resp_future: None,
@@ -106,14 +143,16 @@ impl Resolver for SimpleTcpResolver {
     }
 }
 
-pub struct TcpResponse {
-    resolver: SimpleTcpResolver,
+pub type SimpleTcpResolver = TcpResolver<TcpClientStream<tokio_tcp::TcpStream>>;
+
+pub struct TcpResponse<S: TcpDnsStream> {
+    resolver: TcpResolver<S>,
     query: Query,
     deadline: Delay,
     resp_future: Option<OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>>,
 }
 
-impl Future for TcpResponse {
+impl<S: TcpDnsStream> Future for TcpResponse<S> {
     type Item = DnsResponse;
     type Error = ProtoError;
 
