@@ -16,7 +16,6 @@ use tokio::timer::Delay;
 use trust_dns::client::ClientStreamHandle;
 use trust_dns::client::{BasicClientHandle, ClientFuture};
 use trust_dns::tcp::TcpClientStream;
-use trust_dns_native_tls::tls_client_stream::TlsClientStreamBuilder;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::error::ProtoErrorKind;
 use trust_dns_proto::op::Query;

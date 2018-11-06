@@ -5,10 +5,10 @@ authors = ["Yilin Chen <sticnarf@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-trust-dns = "0.15.0"
-trust-dns-proto = "0.5.0"
-trust-dns-server = "0.15.0"
-trust-dns-native-tls = "0.4.0"
+trust-dns = { version = "0.15.0", git = "https://github.com/bluejekyll/trust-dns", features = ['dns-over-rustls'] }
+trust-dns-proto = { version = "0.5.0", git = "https://github.com/bluejekyll/trust-dns" }
+trust-dns-server = { version = "0.15.0", git = "https://github.com/bluejekyll/trust-dns" }
+trust-dns-rustls = { version = "0.4.0", git = "https://github.com/bluejekyll/trust-dns" }
 tokio = "0.1.11"
 slog = "2.4.1"
 slog-term = "2.4.0"
@@ -24,12 +24,6 @@ toml = "0.4"
 serde = "1.0.80"
 serde_derive = "1.0.80"
 tokio-tcp = "0.1.2"
-
-[patch.crates-io]
-trust-dns-proto = { version = "0.5.0", git = 'https://github.com/sticnarf/trust-dns', branch = 'make-tokio-rustls-optional-for-server' }
-trust-dns = { version = "0.15.0", git = 'https://github.com/sticnarf/trust-dns', branch = 'make-tokio-rustls-optional-for-server', features = ['dns-over-tls'] }
-trust-dns-server = { version = "0.15.0", git = 'https://github.com/sticnarf/trust-dns', branch = 'make-tokio-rustls-optional-for-server' }
-trust-dns-native-tls = { version = "0.4.0", git = 'https://github.com/sticnarf/trust-dns', branch = 'make-tokio-rustls-optional-for-server' }
 
 [profile.release]
 lto = true
