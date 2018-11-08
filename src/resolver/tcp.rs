@@ -162,6 +162,13 @@ impl<S: TcpDnsStream> Future for TcpResponse<S> {
                 if let Some(resp_future) = self.resp_future.take() {
                     let _ = tokio::spawn(resp_future.map(|_| ()).map_err(|_| ()));
                 }
+                // Timeout indicates a connection is actually closed.
+                // (maybe no, but anyway we don't care)
+                let state = self.resolver.state.read();
+                if let Connected(_) = &*state {
+                    drop(state);
+                    *self.resolver.state.write() = NotConnected;
+                }
                 return Err(ProtoErrorKind::Timeout.into());
             }
             Err(e) => return Err(e.into()),
@@ -227,9 +234,16 @@ impl<S: TcpDnsStream> Future for TcpResponse<S> {
                                 Ok(Async::NotReady)
                             }
                             Err(e) => {
+                                drop(state);
                                 use failure::Fail;
-                                error!(STDERR, "Immediate lookup error: {:?}", e.backtrace());
+                                error!(
+                                    STDERR,
+                                    "Reset connection due to immediate lookup error: {:?}",
+                                    e.backtrace()
+                                );
                                 self.resp_future = None;
+                                *self.resolver.state.write() = NotConnected;
+                                task::current().notify();
                                 Ok(Async::NotReady)
                             }
                         }
