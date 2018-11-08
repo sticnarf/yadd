@@ -124,6 +124,13 @@ impl Future for TcpResponse {
                 if let Some(resp_future) = self.resp_future.take() {
                     let _ = tokio::spawn(resp_future.map(|_| ()).map_err(|_| ()));
                 }
+                // Timeout indicates a connection is actually closed.
+                // (maybe no, but anyway we don't care)
+                let state = self.resolver.state.read();
+                if let Connected(_) = &*state {
+                    drop(state);
+                    *self.resolver.state.write() = NotConnected;
+                }
                 return Err(ProtoErrorKind::Timeout.into());
             }
             Err(e) => return Err(e.into()),
