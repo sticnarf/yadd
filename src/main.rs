@@ -14,6 +14,7 @@ use slog::{o, Drain, Logger};
 use tokio;
 use tokio::net::udp::UdpSocket;
 use tokio::prelude::*;
+use failure::Fail;
 
 lazy_static! {
     static ref STDOUT: Logger = stdout_logger();

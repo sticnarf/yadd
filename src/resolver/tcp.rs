@@ -189,9 +189,16 @@ impl Future for TcpResponse {
                                 Ok(Async::NotReady)
                             }
                             Err(e) => {
+                                drop(state);
                                 use failure::Fail;
-                                error!(STDERR, "Immediate lookup error: {:?}", e.backtrace());
+                                error!(
+                                    STDERR,
+                                    "Reset connection due to immediate lookup error: {:?}",
+                                    e.backtrace()
+                                );
                                 self.resp_future = None;
+                                *self.resolver.state.write() = NotConnected;
+                                task::current().notify();
                                 Ok(Async::NotReady)
                             }
                         }
