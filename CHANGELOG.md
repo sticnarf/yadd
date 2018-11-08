@@ -1,3 +1,7 @@
+# 0.2.2
+
+* Reset TCP connection immediately if an error occurs.
+
 # 0.2.1
 
 * Fix panics when no result is available.
