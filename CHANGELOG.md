@@ -1,3 +1,9 @@
+# 0.2.3
+
+* Returns SERVFAIL when no response is available.
+
+* Reset TCP connection when timeout occurs.
+
 # 0.2.2
 
 * Reset TCP connection immediately if an error occurs.

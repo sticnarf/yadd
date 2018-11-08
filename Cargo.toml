@@ -1,6 +1,6 @@
 [package]
 name = "yadd"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Yilin Chen <sticnarf@gmail.com>"]
 edition = "2018"
 
