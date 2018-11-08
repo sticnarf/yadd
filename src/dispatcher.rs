@@ -14,6 +14,7 @@ use trust_dns::serialize::binary::{BinDecoder, BinEncodable};
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::op::header::Header;
 use trust_dns_proto::op::header::MessageType;
+use trust_dns_proto::op::response_code::ResponseCode;
 use trust_dns_proto::rr::record_data::RData;
 use trust_dns_proto::rr::RrsetRecords;
 use trust_dns_server::authority::{AuthLookup, LookupRecords, MessageResponseBuilder, Queries};
@@ -165,9 +166,11 @@ impl RequestHandler for Dispatcher {
             });
 
         // Build response header
+        let id = request.message.id();
+        let op_code = request.message.op_code();
         let mut header = Header::new();
         header.set_message_type(MessageType::Response);
-        header.set_id(request.message.id());
+        header.set_id(id);
 
         let send_future = result_future
             .and_then(move |resp| {
@@ -179,15 +182,18 @@ impl RequestHandler for Dispatcher {
                 }))?;
                 let mut builder = MessageResponseBuilder::new(queries.as_ref());
 
-                // Put answers into the response
-                if let Some(ref resp) = resp {
+                let message = if let Some(ref resp) = resp {
+                    // Put answers into the response
                     let answers = resp.answers();
                     builder.answers(AuthLookup::Records(LookupRecords::RecordsIter(
                         RrsetRecords::RecordsOnly(answers.iter()),
                     )));
-                }
+                    builder.build(header)
+                } else {
+                    // No answer available (Usually due to bad network condition)
+                    builder.error_msg(id, op_code, ResponseCode::ServFail)
+                };
 
-                let message = builder.build(header);
                 Ok(response_handle.send_response(message)?)
             })
             .map_err(|e: ProtoError| error!(STDERR, "{}", e));
