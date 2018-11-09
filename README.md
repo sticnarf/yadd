@@ -14,9 +14,9 @@ For users in China, it is a common use case to prevent DNS spoofing as well as g
 
 Just keep the provided `config.toml` and `chnroutes.txt` in the same directory with the yadd executable and run yadd.
 
-This instructs yadd to listen on `127.0.0.1:5300` and forward DNS queries to `119.29.29.29` (DNSPod), `223.5.5.5` (AliDNS) and `208.67.222.222:5353` (OpenDNS).
+This instructs yadd to listen on `127.0.0.1:5300` and forward DNS queries to `119.29.29.29` (DNSPod DNS), `223.5.5.5` (AliDNS), `208.67.222.222` (OpenDNS) and `1.1.1.1` (Cloudflare DNS).
 
-Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. Otherwise, it will adopt the result from `208.67.222.222:5353` instead.
+Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. Otherwise, it will adopt the result from OpenDNS or Cloudflare DNS instead.
 
 ## Configuration
 
@@ -39,25 +39,33 @@ Pay attention that root privilege may be required if you specifies a port below 
 ```toml
 [upstreams]
   [upstreams.dnspod]
-  address = "119.29.29.29:53"
+  address = "119.29.29.29"
   network = "udp"
 
   [upstreams.alidns]
-  address = "223.5.5.5:53"
+  address = "223.5.5.5"
   network = "udp"
 
   [upstreams.opendns]
   address = "208.67.222.222:5353"
-  network = "udp"
+  network = "tcp"
+
+  [upstreams.cloudflare]
+  address = "1.1.1.1"
+  network = "tls"
+  tls-host = "cloudflare-dns.com"
 ```
 
 Set up the upstream servers here. DNS queries will be forwarded to all the servers set up here.
 
 The `dnspod` and `opendns` after `upstreams.` are the names of the upstream servers. They will be used later in your rules.
 
-You must specify the port in the `address` attribute, even if it uses the standard port `53`. IPv6 is supported here, for example, you can write `address = "[2001:4860:4860::8888]:53"`.
+If you ignore the port in the `address` attribute, the default port is applied. (`53` for TCP and UDP, `853` for TLS)
 
-`network` atrribute supports two options: `udp` and `tcp`. Make sure the DNS server supports TCP if you specify `tcp` here.
+IPv6 is supported here, for example, `address = "2001:4860:4860::8888"` or `address = "[2001:4860:4860::8888]:53"` are both allowed.
+
+The `network` atrribute supports three options: `udp`, `tcp` and `tls`. Make sure the DNS server supports the protocol you specify here.
+The `tls` means using **DNS over TLS**. You must add `tls-host` to the configuration.
 
 Multiplexing is enabled for TCP connections. This means no second connection will be established before the previous one is closed.
 

@@ -68,8 +68,11 @@ impl Dispatcher {
         for rule in &*self.rules {
             if rule.upstreams.iter().any(|s| s == name) {
                 let is_match = rule.ranges.iter().any(|range_pattern| {
+                    // Process the leading `!`
                     let range_name = range_pattern.trim_start_matches('!');
                     let toggle = (range_pattern.len() - range_name.len()) % 2 == 1;
+
+                    // See if the range contains the IP
                     let range = self.ranges.get(range_name);
                     range
                         .map(|range| {
