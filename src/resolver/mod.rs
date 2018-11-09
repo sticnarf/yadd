@@ -3,9 +3,6 @@ use trust_dns::op::{DnsResponse, Query};
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::xfer::DnsRequestOptions;
 
-pub use self::tcp::SimpleTcpResolver;
-pub use self::udp::SimpleUdpResolver;
-
 pub trait Resolver: Send + Sync {
     fn query(
         &self,

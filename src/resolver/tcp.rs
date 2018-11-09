@@ -11,11 +11,14 @@ use std::time::Instant;
 use lock_api::{RwLock, RwLockReadGuard};
 use parking_lot::RawRwLock;
 use slog::{debug, error, warn};
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use tokio::timer::Delay;
 use trust_dns::client::ClientStreamHandle;
 use trust_dns::client::{BasicClientHandle, ClientFuture};
 use trust_dns::tcp::TcpClientStream;
+use trust_dns_native_tls::TlsClientStream;
+use trust_dns_native_tls::TlsClientStreamBuilder;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::error::ProtoErrorKind;
 use trust_dns_proto::op::Query;
@@ -25,37 +28,75 @@ use trust_dns_proto::xfer::DnsClientStream;
 use trust_dns_proto::xfer::DnsResponse;
 use trust_dns_proto::xfer::{DnsMultiplexerSerialResponse, OneshotDnsResponseReceiver};
 
-pub trait TcpDnsStream: Sync + Send + 'static {
+pub trait TcpDnsStreamBuilder: Clone + Debug + Sync + Send + 'static {
     type Connect: Future<Item = Self::Stream, Error = ProtoError> + Send;
     type Stream: DnsClientStream + Sync + Send + 'static;
     fn with_timeout(
-        name_server: SocketAddr,
+        &self,
         timeout: Duration,
     ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>);
 }
 
-impl TcpDnsStream for TcpClientStream<tokio_tcp::TcpStream> {
-    type Connect = TcpClientConnect;
-    type Stream = TcpClientStream<tokio_tcp::TcpStream>;
-    fn with_timeout(
-        name_server: SocketAddr,
-        timeout: Duration,
-    ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>) {
-        TcpClientStream::with_timeout(name_server, timeout)
+#[derive(Clone, Debug)]
+pub struct SimpleTcpDnsStreamBuilder {
+    name_server: SocketAddr,
+}
+
+impl SimpleTcpDnsStreamBuilder {
+    pub fn new(name_server: SocketAddr) -> Self {
+        SimpleTcpDnsStreamBuilder { name_server }
     }
 }
 
-pub struct TcpResolver<S: TcpDnsStream> {
-    server_addr: SocketAddr,
-    timeout: Duration,
-    state: Arc<RwLock<RawRwLock, ConnectionState>>,
-    phantom: PhantomData<S>,
+impl TcpDnsStreamBuilder for SimpleTcpDnsStreamBuilder {
+    type Connect = TcpClientConnect;
+    type Stream = TcpClientStream<tokio_tcp::TcpStream>;
+    fn with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>) {
+        TcpClientStream::with_timeout(self.name_server, timeout)
+    }
 }
 
-impl<S: TcpDnsStream> Clone for TcpResolver<S> {
+#[derive(Clone, Debug)]
+pub struct TlsDnsStreamBuilder {
+    name_server: SocketAddr,
+    host: String,
+}
+
+impl TlsDnsStreamBuilder {
+    pub fn new(name_server: SocketAddr, host: String) -> Self {
+        TlsDnsStreamBuilder { name_server, host }
+    }
+}
+
+impl TcpDnsStreamBuilder for TlsDnsStreamBuilder {
+    type Connect = Box<dyn Future<Item = TlsClientStream, Error = ProtoError> + Send>;
+    type Stream = TlsClientStream;
+
+    fn with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>) {
+        // TODO Timeout is ignored because TlsClientStreamBuilder does not support a timeout
+        let (stream, handle) =
+            TlsClientStreamBuilder::new().build(self.name_server, self.host.clone());
+        (stream, Box::new(handle))
+    }
+}
+
+pub struct TcpResolver<B: TcpDnsStreamBuilder> {
+    builder: B,
+    timeout: Duration,
+    state: Arc<RwLock<RawRwLock, ConnectionState>>,
+    phantom: PhantomData<B>,
+}
+
+impl<B: TcpDnsStreamBuilder + Clone> Clone for TcpResolver<B> {
     fn clone(&self) -> Self {
         TcpResolver {
-            server_addr: self.server_addr,
+            builder: self.builder.clone(),
             timeout: self.timeout,
             state: self.state.clone(),
             phantom: PhantomData,
@@ -69,14 +110,14 @@ pub enum ConnectionState {
     Connected(BasicClientHandle<DnsMultiplexerSerialResponse>),
 }
 
-impl<S: TcpDnsStream> TcpResolver<S> {
-    pub fn new(server_addr: SocketAddr) -> Self {
-        Self::with_timeout(server_addr, Duration::from_secs(5))
+impl<B: TcpDnsStreamBuilder> TcpResolver<B> {
+    pub fn new(builder: B) -> Self {
+        Self::with_timeout(builder, Duration::from_secs(5))
     }
 
-    pub fn with_timeout(server_addr: SocketAddr, timeout: Duration) -> Self {
+    pub fn with_timeout(builder: B, timeout: Duration) -> Self {
         TcpResolver {
-            server_addr,
+            builder,
             timeout,
             state: Arc::new(RwLock::new(NotConnected)),
             phantom: PhantomData,
@@ -87,11 +128,11 @@ impl<S: TcpDnsStream> TcpResolver<S> {
         let mut state_ref = self.state.write();
         match &*state_ref {
             NotConnected => {
-                let server_addr = self.server_addr;
-                let (connect, handle) = S::with_timeout(server_addr, self.timeout / 2);
+                let builder = self.builder.clone();
+                let (connect, handle) = builder.with_timeout(self.timeout / 2);
                 let state = self.state.clone();
                 let stream = connect.map(move |stream| {
-                    debug!(STDERR, "TCP connection to {} established.", server_addr);
+                    debug!(STDERR, "TCP connection to {:?} established.", builder);
                     let mut state = state.write();
                     match &mut *state {
                         Connecting(handle) => {
@@ -113,8 +154,9 @@ impl<S: TcpDnsStream> TcpResolver<S> {
                 *state_ref = Connecting(handle);
 
                 let state = self.state.clone();
+                let builder = self.builder.clone();
                 let bg = bg.and_then(move |()| {
-                    debug!(STDERR, "TCP connection to {} closed", server_addr);
+                    debug!(STDERR, "TCP connection to {:?} closed", builder);
                     *state.write() = NotConnected;
                     future::empty()
                 });
@@ -127,7 +169,7 @@ impl<S: TcpDnsStream> TcpResolver<S> {
     }
 }
 
-impl<S: TcpDnsStream> Resolver for TcpResolver<S> {
+impl<B: TcpDnsStreamBuilder> Resolver for TcpResolver<B> {
     fn query(
         &self,
         query: Query,
@@ -142,16 +184,18 @@ impl<S: TcpDnsStream> Resolver for TcpResolver<S> {
     }
 }
 
-pub type SimpleTcpResolver = TcpResolver<TcpClientStream<tokio_tcp::TcpStream>>;
+pub type SimpleTcpResolver = TcpResolver<SimpleTcpDnsStreamBuilder>;
 
-pub struct TcpResponse<S: TcpDnsStream> {
-    resolver: TcpResolver<S>,
+pub type TlsResolver = TcpResolver<TlsDnsStreamBuilder>;
+
+pub struct TcpResponse<B: TcpDnsStreamBuilder> {
+    resolver: TcpResolver<B>,
     query: Query,
     deadline: Delay,
     resp_future: Option<OneshotDnsResponseReceiver<DnsMultiplexerSerialResponse>>,
 }
 
-impl<S: TcpDnsStream> Future for TcpResponse<S> {
+impl<B: TcpDnsStreamBuilder> Future for TcpResponse<B> {
     type Item = DnsResponse;
     type Error = ProtoError;
 
@@ -194,9 +238,9 @@ impl<S: TcpDnsStream> Future for TcpResponse<S> {
                     Connecting(_) => {
                         drop(state);
                         debug!(
-                            STDERR,
-                            "Lookup error occurrs when connection is not established. Reset connection."
-                        );
+                                STDERR,
+                                "Lookup error occurrs when connection is not established. Reset connection. {}", e
+                            );
                         self.resp_future = None;
                         *self.resolver.state.write() = NotConnected;
                         task::current().notify();
@@ -264,14 +308,59 @@ mod tests {
     use trust_dns::rr::{Name, RecordType};
 
     #[test]
-    fn sync_query() {
+    fn query_sync_simple_tcp() {
         let mut runtime = Runtime::new().expect("Unable to create a tokio runtime");
         let expected: IpAddr = [1, 1, 1, 1].into();
         let resolver: SimpleTcpResolver = runtime
             .block_on(future::lazy(|| {
                 future::ok::<SimpleTcpResolver, ()>(SimpleTcpResolver::new(
-                    ([1, 1, 1, 1], 53).into(),
+                    SimpleTcpDnsStreamBuilder::new(([1, 1, 1, 1], 53).into()),
                 ))
+            }))
+            .unwrap();
+        let resolver2 = resolver.clone();
+        let response = runtime
+            .block_on(future::lazy(move || {
+                let query =
+                    Query::query(Name::from_str("one.one.one.one.").unwrap(), RecordType::A);
+                resolver2.query(query)
+            }))
+            .expect("Unable to get response");
+        assert!(response
+            .answers()
+            .iter()
+            .flat_map(|record| record.rdata().to_ip_addr())
+            .any(|ip| ip == expected));
+
+        thread::sleep(Duration::from_secs(1));
+
+        // Run a second time.
+        // There once was a problem that the server would only respond to the first request.
+        let resolver2 = resolver.clone();
+        let response = runtime
+            .block_on(future::lazy(move || {
+                let query =
+                    Query::query(Name::from_str("one.one.one.one.").unwrap(), RecordType::A);
+                resolver2.query(query)
+            }))
+            .expect("Unable to get response");
+        assert!(response
+            .answers()
+            .iter()
+            .flat_map(|record| record.rdata().to_ip_addr())
+            .any(|ip| ip == expected));
+    }
+
+    #[test]
+    fn query_sync_tls() {
+        let mut runtime = Runtime::new().expect("Unable to create a tokio runtime");
+        let expected: IpAddr = [1, 1, 1, 1].into();
+        let resolver: TlsResolver = runtime
+            .block_on(future::lazy(|| {
+                future::ok::<TlsResolver, ()>(TlsResolver::new(TlsDnsStreamBuilder::new(
+                    ([1, 1, 1, 1], 853).into(),
+                    "cloudflare-dns.com".to_string(),
+                )))
             }))
             .unwrap();
         let resolver2 = resolver.clone();

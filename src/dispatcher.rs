@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use crate::config::{Config, NetworkType, Rule, RuleAction, UpstreamConfig};
 use crate::ip::IpRange;
-use crate::resolver::{Resolver, SimpleTcpResolver, SimpleUdpResolver};
+use crate::resolver::tcp::{SimpleTcpDnsStreamBuilder, SimpleTcpResolver};
+use crate::resolver::udp::SimpleUdpResolver;
+use crate::resolver::Resolver;
 use crate::{Transpose, STDERR};
 
 use slog::{debug, error};
@@ -36,9 +38,9 @@ impl Dispatcher {
                 (
                     name.to_owned(),
                     match network {
-                        NetworkType::Tcp => {
-                            Box::new(SimpleTcpResolver::new(*address)) as Box<Resolver>
-                        }
+                        NetworkType::Tcp => Box::new(SimpleTcpResolver::new(
+                            SimpleTcpDnsStreamBuilder::new(*address),
+                        )) as Box<Resolver>,
                         NetworkType::Udp => Box::new(SimpleUdpResolver::new(*address)),
                     },
                 )
