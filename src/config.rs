@@ -10,11 +10,12 @@ use crate::ip::IpRange;
 use failure::{err_msg, Error};
 use ipnet::IpNet;
 use serde_derive::Deserialize;
+use std::net::IpAddr;
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub bind: SocketAddr,
-    pub upstreams: Arc<HashMap<String, UpstreamConfig>>,
+    pub upstreams: Arc<HashMap<String, Upstream>>,
     pub ranges: Arc<HashMap<String, IpRange>>,
     pub rules: Arc<Vec<Rule>>,
 }
@@ -27,11 +28,32 @@ pub struct ConfigBuilder {
     rules: Vec<Rule>,
 }
 
+#[derive(Debug)]
+pub enum Upstream {
+    TcpUpstream {
+        address: SocketAddr,
+    },
+    UdpUpstream {
+        address: SocketAddr,
+    },
+    TlsUpstream {
+        address: SocketAddr,
+        tls_host: String,
+    },
+}
+
 impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Error> {
         if self.upstreams.is_empty() {
             return Err(err_msg("You must configure at least one upstream server!"));
         }
+
+        let upstreams: Result<HashMap<String, Upstream>, Error> = self
+            .upstreams
+            .into_iter()
+            .map(|(key, upstream)| upstream.build().map(move |upstream| (key, upstream)))
+            .collect();
+
         let ranges: Result<HashMap<String, IpRange>, Error> = self
             .ranges
             .into_iter()
@@ -42,7 +64,7 @@ impl ConfigBuilder {
             .collect();
         Ok(Config {
             bind: self.bind,
-            upstreams: Arc::new(self.upstreams),
+            upstreams: Arc::new(upstreams?),
             ranges: Arc::new(ranges?),
             rules: Arc::new(self.rules),
         })
@@ -50,21 +72,51 @@ impl ConfigBuilder {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct UpstreamConfig {
-    pub address: SocketAddr,
-    pub network: NetworkType,
+struct UpstreamConfig {
+    address: String,
+    network: NetworkType,
     #[serde(rename = "tls-host")]
-    pub tls_host: Option<String>
+    tls_host: Option<String>,
+}
+
+impl UpstreamConfig {
+    fn build(self) -> Result<Upstream, Error> {
+        let mut address = self.address.parse::<SocketAddr>();
+        if let Err(_) = address {
+            address = self
+                .address
+                .parse::<IpAddr>()
+                .map(|addr| SocketAddr::new(addr, self.network.default_port()));
+        }
+        let address = address.map_err(|_| err_msg(format!("Invalid address: {}", self.address)))?;
+        match self.network {
+            NetworkType::Tcp => Ok(Upstream::TcpUpstream { address }),
+            NetworkType::Udp => Ok(Upstream::UdpUpstream { address }),
+            NetworkType::Tls => {
+                let tls_host = self.tls_host.ok_or(err_msg("tls-host is missing"))?;
+                Ok(Upstream::TlsUpstream { address, tls_host })
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
-pub enum NetworkType {
+enum NetworkType {
     #[serde(rename = "tcp")]
     Tcp,
     #[serde(rename = "udp")]
     Udp,
     #[serde(rename = "tls")]
-    Tls
+    Tls,
+}
+
+impl NetworkType {
+    fn default_port(&self) -> u16 {
+        match self {
+            NetworkType::Tcp | NetworkType::Udp => 53,
+            NetworkType::Tls => 853,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

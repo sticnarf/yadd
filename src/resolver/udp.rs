@@ -38,7 +38,7 @@ impl Resolver for SimpleUdpResolver {
     fn query(
         &self,
         query: Query,
-    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
+    ) -> Box<Future<Item=DnsResponse, Error=ProtoError> + 'static + Send> {
         Box::new(self.handle.clone().lookup(query, DNS_OPTIONS))
     }
 }
@@ -59,7 +59,7 @@ mod tests {
         let resolver: SimpleUdpResolver = runtime
             .block_on(future::lazy(|| {
                 future::ok::<SimpleUdpResolver, ()>(SimpleUdpResolver::new(
-                    ([1, 1, 1, 1], 53).into(),
+                    ([208, 67, 222, 222], 53).into(),
                 ))
             }))
             .unwrap();

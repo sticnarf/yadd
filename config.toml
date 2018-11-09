@@ -2,11 +2,11 @@ bind = "127.0.0.1:5300"
 
 [upstreams]
   [upstreams.dnspod]
-  address = "119.29.29.29:53"
+  address = "119.29.29.29"
   network = "udp"
 
   [upstreams.alidns]
-  address = "223.5.5.5:53"
+  address = "223.5.5.5"
   network = "udp"
 
   [upstreams.opendns]
@@ -14,7 +14,7 @@ bind = "127.0.0.1:5300"
   network = "tcp"
 
   [upstreams.cloudflare]
-  address = "1.1.1.1:853"
+  address = "1.1.1.1"
   network = "tls"
   tls-host = "cloudflare-dns.com"
 

@@ -2,13 +2,16 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
-use crate::config::{Config, NetworkType, Rule, RuleAction, UpstreamConfig};
+use crate::config::{Config, Rule, RuleAction};
 use crate::ip::IpRange;
-use crate::resolver::tcp::{SimpleTcpDnsStreamBuilder, SimpleTcpResolver, TlsDnsStreamBuilder, TlsResolver};
+use crate::resolver::tcp::{
+    SimpleTcpDnsStreamBuilder, SimpleTcpResolver, TlsDnsStreamBuilder, TlsResolver,
+};
 use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
 use crate::{Transpose, STDERR};
 
+use crate::config::Upstream;
 use slog::{debug, error};
 use tokio::prelude::*;
 use trust_dns::op::{DnsResponse, Query};
@@ -34,15 +37,20 @@ impl Dispatcher {
         let resolvers: HashMap<_, _> = config
             .upstreams
             .iter()
-            .map(|(name, UpstreamConfig { address, network, tls_host })| {
+            .map(|(name, upstream)| {
                 (
                     name.to_owned(),
-                    match network {
-                        NetworkType::Tcp => Box::new(SimpleTcpResolver::new(
+                    match upstream {
+                        Upstream::TcpUpstream { address } => Box::new(SimpleTcpResolver::new(
                             SimpleTcpDnsStreamBuilder::new(*address),
-                        )) as Box<Resolver>,
-                        NetworkType::Udp => Box::new(SimpleUdpResolver::new(*address)),
-                        NetworkType::Tls => Box::new(TlsResolver::new(TlsDnsStreamBuilder::new(*address, tls_host.clone().unwrap())))
+                        ))
+                            as Box<Resolver>,
+                        Upstream::UdpUpstream { address } => {
+                            Box::new(SimpleUdpResolver::new(*address))
+                        }
+                        Upstream::TlsUpstream { address, tls_host } => Box::new(TlsResolver::new(
+                            TlsDnsStreamBuilder::new(*address, tls_host.clone()),
+                        )),
                     },
                 )
             })
