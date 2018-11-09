@@ -53,6 +53,8 @@ impl ConfigBuilder {
 pub struct UpstreamConfig {
     pub address: SocketAddr,
     pub network: NetworkType,
+    #[serde(rename = "tls-host")]
+    pub tls_host: Option<String>
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +63,8 @@ pub enum NetworkType {
     Tcp,
     #[serde(rename = "udp")]
     Udp,
+    #[serde(rename = "tls")]
+    Tls
 }
 
 #[derive(Debug, Deserialize)]

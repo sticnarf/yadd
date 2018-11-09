@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::config::{Config, NetworkType, Rule, RuleAction, UpstreamConfig};
 use crate::ip::IpRange;
-use crate::resolver::tcp::{SimpleTcpDnsStreamBuilder, SimpleTcpResolver};
+use crate::resolver::tcp::{SimpleTcpDnsStreamBuilder, SimpleTcpResolver, TlsDnsStreamBuilder, TlsResolver};
 use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
 use crate::{Transpose, STDERR};
@@ -34,7 +34,7 @@ impl Dispatcher {
         let resolvers: HashMap<_, _> = config
             .upstreams
             .iter()
-            .map(|(name, UpstreamConfig { address, network })| {
+            .map(|(name, UpstreamConfig { address, network, tls_host })| {
                 (
                     name.to_owned(),
                     match network {
@@ -42,6 +42,7 @@ impl Dispatcher {
                             SimpleTcpDnsStreamBuilder::new(*address),
                         )) as Box<Resolver>,
                         NetworkType::Udp => Box::new(SimpleUdpResolver::new(*address)),
+                        NetworkType::Tls => Box::new(TlsResolver::new(TlsDnsStreamBuilder::new(*address, tls_host.clone().unwrap())))
                     },
                 )
             })
