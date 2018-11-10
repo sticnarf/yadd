@@ -1,0 +1,106 @@
+# This file is just a demostration of all configurable options and has NO practical meanings.
+
+# Root privilege may be required if you specifies a port below 1024.
+bind = "127.0.0.1:5300" # the address that yadd listens on
+
+# DNS requests will be forwarded to all the upstream servers set up here
+# except those with `default = false`.
+[upstreams]
+  # The 'dnspod' is the name of the upstream server.
+  # It can be used later in the rules.
+  [upstreams.dnspod]
+    # Default port 53 can be ignored for DNS over UDP
+    address = "119.29.29.29" # the address of the DNS server
+    network = "udp"
+
+  [upstreams.opendns]
+    # If you use a non-standard port, you should specify the port in the address.
+    address = "208.67.222.222:5353"
+    # TCP is supported
+    network = "tcp"
+
+  [upstreams.opendns_v6]
+    # IPv6 is supported.
+    address = "[2620:0:ccc::2]:5353"
+    # TCP is supported
+    network = "tcp"
+
+  [upstreams.cloudflare]
+    # We ignore the port here. The default port 853 for DNS over TLS is used.
+    address = "1.1.1.1"
+    # DNS over TLS is supported.
+    network = "tls"
+    # If you use DNS over TLS, you must give the TLS host of the upstream server.
+    tls-host = "cloudflare-dns.com"
+
+  [upstreams.opennic]
+    address = "2a05:dfc7:5::53"
+    network = "udp"
+    # This tells yadd not to forward requests to this server by default.
+    # But you can use it for specific domains.
+    default = false
+
+# You define domain lists here.
+[domains]
+  # The 'opennic' is the tag of the domain list.
+  # It is useful in the rules later in the file.
+  [domains.opennic]
+    # You can define the patterns directly in the config file using the list attribute.
+    # If one of the patterns matches the right end of the domain, then the domain
+    # is considered inside of this domain list.
+    list = [
+      ".bbs", ".chan", ".cyb", ".dyn", ".geek", ".gopher", ".indy",
+      ".libre", ".neo", ".null", ".o", ".oss", ".oz", ".parody", ".pirate"
+    ]
+    # If you define the upstreams field in a domain list, yadd will forward the requests
+    # ONLY towards the upstream servers defined here.
+    upstreams = ["opennic"]
+
+  [domains.poisoned]
+    list = ["twitter.com", "facebook.com", "youtube.com"]
+    # Besides defining patterns directly in the config file, it is allowed
+    # to read them from files. Each file should contain lines of patterns only,
+    # except empty lines and lines starting with `#`, which means it is a comment.
+    files = ["gfwlist.txt"]
+    # If no upstreams field is defined, yadd will simply forwards the requests
+    # to default upstream servers.
+
+
+# Set up the IP ranges you want to use later in your rules here.
+[ranges]
+  # The 'my_range' is the name of the range.
+  # It can be used later in the rules.
+  [ranges.my_range]
+  # You can define CIDRs directly in the config file using the list attribute.
+  # IPv4 CIDRs and IPv6 CIDRs can be mixed.
+  list = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8"]
+  # Besides defining CIDRs directly in the config file, it is allowed
+  # to read them from files. Each file should contain lines of CIDRs only,
+  # except empty lines and lines starting with `#`, which means it is a comment.
+  files = ["chnroutes.txt"]
+  # Of course, it is okay to use 'list' or 'files' alone to define an IP range.
+
+# Multiple rules can be defined to filter responses.
+# If all defined requirements are met, the rule is applied.
+# Rules are checked in the same order as they defined. The first matched rule is applied.
+[[rules]]
+upstreams = ["opendns", "opendns_v6"] # requires the response is from one of the specific upstream servers
+ranges = ["my_range"] # requires the response IP is in one of the specific IP ranges
+domains = ["poisoned"] # requires the domain is in one of the specific domain lists
+# Currently, 'drop' is the only action available.
+# The first response not dropped is adopted and returned to the client.
+# More actions may be added in the future.
+action = "drop"
+
+[[rules]]
+upstreams = ["dnspod"]
+# The ranges and domains array can contain names with a leading `!` for inversion.
+# For instance, `!my_range` matches all IP addresses which are not in the `my_range` range.
+ranges = ["!my_range"]
+domains = ["!poisoned"]
+action = "drop"
+
+[[rules]]
+# It is also allowed to have no requirements.
+# This rule matches all responses. So It will drop all the responses.
+action = "drop"

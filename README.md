@@ -6,114 +6,45 @@ Yadd (**Y**et **A**nother **D**NS **D**ispatcher) forwards DNS queries to multip
 
 It aims to be fast and flexible but yet easy to use.
 
-Prebuilt releases are available [here](https://github.com/sticnarf/yadd/releases). Because the README in the master branch may be newer than the release you use, please switch to the corresponding git tag before going on reading.
+Prebuilt releases are available [here](https://github.com/sticnarf/yadd/releases). 
 
-## ChinaDNS
+Because the docs in the master branch may be newer than the release you use, please switch to the corresponding git tag before going on reading.
 
-For users in China, it is a common use case to prevent DNS spoofing as well as get good CDN IP resolution, which the default configuration is used for.
+## Features
 
-Just keep the provided `config.toml` and `chnroutes.txt` in the same directory with the yadd executable and run yadd.
+* DNS over various protocols
+  * UDP
+  * TCP
+  * *TLS*
 
-This instructs yadd to listen on `127.0.0.1:5300` and forward DNS queries to `119.29.29.29` (DNSPod DNS), `223.5.5.5` (AliDNS), `208.67.222.222` (OpenDNS) and `1.1.1.1` (Cloudflare DNS).
+* Full control over dispatching
+  * Dispatch requests based on domain lists
+  * Filter responses based on custom rules (consisting of IP ranges and more)
 
-Yadd will return the result given by DNSPod or AliDNS if it is an IP in China. Otherwise, it will adopt the result from OpenDNS or Cloudflare DNS instead.
+* Good performance
+  * Forward to all upstreams simultaneously
+  * TCP connection reuse
+  
+## Usage
 
-## Configuration
+The path of the configuration file is passed using `-c`:
 
-**The configuration file should be intuitive enough to be understood without extra explanation. So, try checking `config.toml` first before reading the following possibly terribly long documentation.**
-
-Belows are the detailed explanations for `config.toml` and how you can customize it, part by part.
-
-### Global settings
-
-```toml
-bind = "127.0.0.1:5300"
+```bash
+$ ./yadd -c <CONFIG_FILE>
 ```
 
-It is the address that yadd listens on. Feel free to change it based on your need.
+If you ignore `-c`, yadd will load `config.toml`.
 
-Pay attention that root privilege may be required if you specifies a port below 1024.
+*Note: All non-absolute file paths (in the command line arguments and in the config file) are relative to the working directory instead of the location of the executable.*
 
-### Upstreams
+## Examples
 
-```toml
-[upstreams]
-  [upstreams.dnspod]
-  address = "119.29.29.29"
-  network = "udp"
+* [ChinaDNS](examples/chinadns.toml) (Users in China should prefer this.)
 
-  [upstreams.alidns]
-  address = "223.5.5.5"
-  network = "udp"
+* [OpenNIC](examples/opennic.toml) (Use OpenNIC DNS for OpenNIC domains and Google DNS for the others.)
 
-  [upstreams.opendns]
-  address = "208.67.222.222:5353"
-  network = "tcp"
-
-  [upstreams.cloudflare]
-  address = "1.1.1.1"
-  network = "tls"
-  tls-host = "cloudflare-dns.com"
-```
-
-Set up the upstream servers here. DNS queries will be forwarded to all the servers set up here.
-
-The `dnspod` and `opendns` after `upstreams.` are the names of the upstream servers. They will be used later in your rules.
-
-If you ignore the port in the `address` attribute, the default port is applied. (`53` for TCP and UDP, `853` for TLS)
-
-IPv6 is supported here, for example, `address = "2001:4860:4860::8888"` or `address = "[2001:4860:4860::8888]:53"` are both allowed.
-
-The `network` atrribute supports three options: `udp`, `tcp` and `tls`. Make sure the DNS server supports the protocol you specify here.
-The `tls` means using **DNS over TLS**. You must add `tls-host` to the configuration.
-
-Multiplexing is enabled for TCP connections. This means no second connection will be established before the previous one is closed.
-
-### Ranges
-
-```toml
-[ranges]
-  [ranges.cn]
-  files = ["chnroutes.txt"]
-```
-
-Set up the IP ranges you want to use later in your rules here.
-
-Like upstreams, the `cn` after `ranges.` is the name of the range.
-
-A `range` supports two ways of configuration.
-
-First is shown above: give an array of files to the `files` attribute. Yadd will load all the files in the array into the range. Each file should contain lines of CIDRs only, except those starting with `#`, which means it is a comment.
-
-The other one is writing CIDRs directly in the configuration file, using the `list` attribute.
-
-You can use the two ways at the same time. Here is an example:
-
-```toml
-[ranges]
-  [ranges.my-range]
-  files = ["chnroutes.txt"]
-  list = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
-```
-
-Of course, IPv6 CIDRs are supported as well. Feel free to mix IPv4 subnets and IPv6 subnets in a single range. Yadd takes good care of them.
-
-### Rules
-
-```toml
-[[rules]]
-upstreams = ["dnspod", "alidns"]
-ranges = ["!cn"]
-action = "drop"
-```
-
-Rules are how yadd deals with the responses. If the response is from the specified `upstreams` **and** the response IP is in the `ranges`, yadd will do the corresponding `action`.
-
-`upstreams` is an array of upstream server names which are defined in the upstreams section.
-
-The `ranges` array can contain range names as well as the original range name with a leading `!` for inversion. For instance, `!cn` matches all IP addresses which are not in the `cn` range.
-
-The only effective option for `action` attribute now is `drop`. The first response not dropped is adopted and returned to the client. More options will be added in later versions.
+* [Template with all configurable settings](examples/template.toml)
+  (It is exhaustedly commented. Read it if you want to write your own config file.)
 
 ## Build
 
