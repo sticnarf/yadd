@@ -11,19 +11,23 @@ use failure::{err_msg, Error};
 use ipnet::IpNet;
 use serde_derive::Deserialize;
 use std::net::IpAddr;
+use regex::RegexSet;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Config {
     pub bind: SocketAddr,
-    pub upstreams: Arc<HashMap<String, Upstream>>,
-    pub ranges: Arc<HashMap<String, IpRange>>,
-    pub rules: Arc<Vec<Rule>>,
+    pub default_upstreams: Vec<String>,
+    pub upstreams: HashMap<String, Upstream>,
+    pub domains: HashMap<String, Domains>,
+    pub ranges: HashMap<String, IpRange>,
+    pub rules: Vec<Rule>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigBuilder {
     bind: SocketAddr,
     upstreams: HashMap<String, UpstreamConfig>,
+    domains: HashMap<String, DomainsConf>,
     ranges: HashMap<String, IpRangeConf>,
     rules: Vec<Rule>,
 }
@@ -48,10 +52,21 @@ impl ConfigBuilder {
             return Err(err_msg("You must configure at least one upstream server!"));
         }
 
+        let mut default_upstreams = Vec::new();
+
         let upstreams: Result<HashMap<String, Upstream>, Error> = self
             .upstreams
             .into_iter()
-            .map(|(key, upstream)| upstream.build().map(move |upstream| (key, upstream)))
+            .map(|(key, upstream)| {
+                if upstream.default { default_upstreams.push(key.clone()) }
+                upstream.build().map(move |upstream| (key, upstream))
+            })
+            .collect();
+
+        let domains: Result<HashMap<String, Domains>, Error> =  self
+            .domains
+            .into_iter()
+            .map(|(key, domains)| domains.build().map(move |domains| (key, domains)))
             .collect();
 
         let ranges: Result<HashMap<String, IpRange>, Error> = self
@@ -62,11 +77,14 @@ impl ConfigBuilder {
                 conf.read_to(&mut range).map(|()| (key, range))
             })
             .collect();
+
         Ok(Config {
             bind: self.bind,
-            upstreams: Arc::new(upstreams?),
-            ranges: Arc::new(ranges?),
-            rules: Arc::new(self.rules),
+            default_upstreams,
+            upstreams: upstreams?,
+            domains: domains?,
+            ranges: ranges?,
+            rules: self.rules,
         })
     }
 }
@@ -77,9 +95,15 @@ struct UpstreamConfig {
     network: NetworkType,
     #[serde(rename = "tls-host")]
     tls_host: Option<String>,
+    #[serde(default = "UpstreamConfig::default_default")]
+    default: bool
 }
 
 impl UpstreamConfig {
+    fn default_default() -> bool {
+        true
+    }
+
     fn build(self) -> Result<Upstream, Error> {
         let mut address = self.address.parse::<SocketAddr>();
         if let Err(_) = address {
@@ -152,6 +176,57 @@ impl IpRangeConf {
 
         range.simplify();
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct Domains {
+    pub regex_set: RegexSet,
+    pub upstreams: Option<Vec<String>>
+}
+
+#[derive(Debug, Deserialize)]
+struct DomainsConf {
+    files: Option<Vec<String>>,
+    list: Option<Vec<String>>,
+    upstreams: Option<Vec<String>>
+}
+
+impl DomainsConf {
+    fn domain_to_regex_string(domain: &str) -> String {
+        let mut regex_str = domain.replace(".", r"\.");
+        regex_str.push_str(r"\.?$");
+        regex_str
+    }
+
+    fn build(self) -> Result<Domains, Error> {
+        let mut vec = Vec::new();
+
+        if let Some(files) = &self.files {
+            for file in files {
+                let file = File::open(file)?;
+                let reader = BufReader::new(file);
+                for line in reader.lines() {
+                    let line = line?;
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with("#") {
+                        continue;
+                    }
+                    vec.push(Self::domain_to_regex_string(line));
+                }
+            }
+        }
+
+        if let Some(list) = &self.list {
+            for ip_net in list {
+                vec.push(Self::domain_to_regex_string(ip_net.trim()));
+            }
+        }
+
+        Ok(Domains {
+            regex_set: RegexSet::new(&vec)?,
+            upstreams: self.upstreams
+        })
     }
 }
 

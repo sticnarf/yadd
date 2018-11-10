@@ -27,6 +27,7 @@ use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
 
 #[derive(Clone)]
 pub struct Dispatcher {
+    defaults: Arc<Vec<String>>,
     resolvers: Arc<HashMap<String, Box<Resolver>>>,
     ranges: Arc<HashMap<String, IpRange>>,
     rules: Arc<Vec<Rule>>,
@@ -57,9 +58,10 @@ impl Dispatcher {
             .collect();
 
         Dispatcher {
+            defaults: Arc::new(config.default_upstreams),
             resolvers: Arc::new(resolvers),
-            ranges: config.ranges,
-            rules: config.rules,
+            ranges: Arc::new(config.ranges),
+            rules: Arc::new(config.rules),
         }
     }
 
