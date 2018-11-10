@@ -15,7 +15,7 @@ Because the docs in the master branch may be newer than the release you use, ple
 * DNS over various protocols
   * UDP
   * TCP
-  * *TLS*
+  * **TLS**
 
 * Full control over dispatching
   * Dispatch requests based on domain lists
