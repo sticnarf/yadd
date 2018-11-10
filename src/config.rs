@@ -48,10 +48,6 @@ pub enum Upstream {
 
 impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Error> {
-        if self.upstreams.is_empty() {
-            return Err(err_msg("You must configure at least one upstream server!"));
-        }
-
         let mut default_upstreams = Vec::new();
 
         let upstreams: Result<HashMap<String, Upstream>, Error> = self
@@ -62,6 +58,10 @@ impl ConfigBuilder {
                 upstream.build().map(move |upstream| (key, upstream))
             })
             .collect();
+
+        if default_upstreams.is_empty() {
+            return Err(err_msg("You must configure at least one default upstream server!"));
+        }
 
         let domains: Result<HashMap<String, Domains>, Error> =  self
             .domains
@@ -200,6 +200,10 @@ impl DomainsConf {
     }
 
     fn build(self) -> Result<Domains, Error> {
+        if self.upstreams.as_ref().map(|u| u.is_empty()).unwrap_or(false) {
+            return Err(err_msg("An empty array is not allowed in the upstream field."));
+        }
+
         let mut vec = Vec::new();
 
         if let Some(files) = &self.files {

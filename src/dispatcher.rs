@@ -11,6 +11,7 @@ use crate::resolver::udp::SimpleUdpResolver;
 use crate::resolver::Resolver;
 use crate::{Transpose, STDERR};
 
+use crate::config::Domains;
 use crate::config::Upstream;
 use slog::{debug, error};
 use tokio::prelude::*;
@@ -28,7 +29,8 @@ use trust_dns_server::server::{Request, RequestHandler, ResponseHandler};
 #[derive(Clone)]
 pub struct Dispatcher {
     defaults: Arc<Vec<String>>,
-    resolvers: Arc<HashMap<String, Box<Resolver>>>,
+    resolvers: Arc<HashMap<String, Arc<Resolver>>>,
+    domains: Arc<HashMap<String, Domains>>,
     ranges: Arc<HashMap<String, IpRange>>,
     rules: Arc<Vec<Rule>>,
 }
@@ -42,14 +44,14 @@ impl Dispatcher {
                 (
                     name.to_owned(),
                     match upstream {
-                        Upstream::TcpUpstream { address } => Box::new(SimpleTcpResolver::new(
+                        Upstream::TcpUpstream { address } => Arc::new(SimpleTcpResolver::new(
                             SimpleTcpDnsStreamBuilder::new(*address),
                         ))
-                            as Box<Resolver>,
+                            as Arc<Resolver>,
                         Upstream::UdpUpstream { address } => {
-                            Box::new(SimpleUdpResolver::new(*address))
+                            Arc::new(SimpleUdpResolver::new(*address))
                         }
-                        Upstream::TlsUpstream { address, tls_host } => Box::new(TlsResolver::new(
+                        Upstream::TlsUpstream { address, tls_host } => Arc::new(TlsResolver::new(
                             TlsDnsStreamBuilder::new(*address, tls_host.clone()),
                         )),
                     },
@@ -60,6 +62,7 @@ impl Dispatcher {
         Dispatcher {
             defaults: Arc::new(config.default_upstreams),
             resolvers: Arc::new(resolvers),
+            domains: Arc::new(config.domains),
             ranges: Arc::new(config.ranges),
             rules: Arc::new(config.rules),
         }
@@ -98,6 +101,31 @@ impl Dispatcher {
         }
         RuleAction::Accept
     }
+
+    fn dispatch(&self, query: &Query) -> Vec<(&str, Arc<Resolver>)> {
+        let name = query.name().to_ascii();
+        // Find domains section which has an upstream field and matches the name
+        let result = self
+            .domains
+            .iter()
+            .filter(|(_, domains)| domains.upstreams.is_some())
+            .find(|(_, domains)| domains.regex_set.is_match(&name));
+        if let Some((_, domains)) = result {
+            domains
+                .upstreams
+                .as_ref()
+                .unwrap()
+                .iter()
+                .filter_map(|u| self.resolvers.get(u).map(|v| (u.as_str(), v.clone())))
+                .collect()
+        } else {
+            // If no domains section matches, use defaults
+            self.defaults
+                .iter()
+                .filter_map(|u| self.resolvers.get(u).map(|v| (u.as_str(), v.clone())))
+                .collect()
+        }
+    }
 }
 
 impl Resolver for Dispatcher {
@@ -105,9 +133,9 @@ impl Resolver for Dispatcher {
         &self,
         query: Query,
     ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
-        let tasks: Vec<_> = self
-            .resolvers
-            .iter()
+        let resolvers = self.dispatch(&query);
+        let tasks: Vec<_> = resolvers
+            .into_iter()
             .map(|(name, resolver)| {
                 let name1 = name.to_owned();
                 let name2 = name.to_owned();

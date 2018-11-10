@@ -45,7 +45,7 @@ fn config() -> Result<Config, Error> {
         .author("Yilin Chen <sticnarf@gmail.com>")
         .arg(
             Arg::with_name("config")
-                .long("conf")
+                .long("config")
                 .short("c")
                 .takes_value(true)
                 .required(true)
