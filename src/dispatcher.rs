@@ -70,6 +70,11 @@ impl Dispatcher {
 
     fn check_response(&self, name: &str, resp: &DnsResponse) -> RuleAction {
         let answers = resp.answers();
+
+        if answers.is_empty() {
+            return RuleAction::Drop;
+        }
+
         for rule in &*self.rules {
             if rule.upstreams.iter().any(|s| s == name) {
                 let is_match = rule.ranges.iter().any(|range_pattern| {
