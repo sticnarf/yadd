@@ -1,12 +1,12 @@
 use super::*;
-use crate::STDERR;
-
 use self::ConnectionState::*;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
+
+use crate::STDERR;
 
 use lock_api::{RwLock, RwLockReadGuard};
 use parking_lot::RawRwLock;

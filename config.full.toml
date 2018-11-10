@@ -31,12 +31,20 @@ bind = "127.0.0.1:5300"
   ]
   upstreams = ["opennic"]
 
+  [domains.poisoned]
+  list = ["twitter.com", "facebook.com", "youtube.com"]
+
 [ranges]
   [ranges.cn]
   files = ["chnroutes.txt"]
 
   [ranges.private]
   list = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+
+[[rules]]
+upstreams = ["dnspod", "alidns"]
+domains = ["poisoned"]
+action = "drop"
 
 [[rules]]
 upstreams = ["dnspod", "alidns"]

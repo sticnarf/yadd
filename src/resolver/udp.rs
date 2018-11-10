@@ -1,8 +1,9 @@
 use super::*;
-use crate::STDOUT;
 
 use std::net::SocketAddr;
 use std::time::Duration;
+
+use crate::STDOUT;
 
 use slog::debug;
 use trust_dns::client::BasicClientHandle;

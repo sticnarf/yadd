@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use crate::ip::IpRange;
 
@@ -236,8 +235,9 @@ impl DomainsConf {
 
 #[derive(Debug, Deserialize)]
 pub struct Rule {
-    pub upstreams: Vec<String>,
-    pub ranges: Vec<String>,
+    pub upstreams: Option<Vec<String>>,
+    pub ranges: Option<Vec<String>>,
+    pub domains: Option<Vec<String>>,
     pub action: RuleAction,
 }
 
