@@ -41,7 +41,7 @@ fn main() {
 
 fn config() -> Result<Config, Error> {
     let matches = App::new("Yet Another DNS Dispatcher")
-        .version("0.2.3")
+        .version("0.3.0")
         .author("Yilin Chen <sticnarf@gmail.com>")
         .arg(
             Arg::with_name("config")
