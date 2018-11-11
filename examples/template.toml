@@ -1,6 +1,6 @@
 # This file is just a demostration of all configurable options and has NO practical meanings.
 
-# Root privilege may be required if you specifies a port below 1024.
+# Root privilege may be required if you specify a port below 1024.
 bind = "127.0.0.1:5300" # the address that yadd listens on
 
 # DNS requests will be forwarded to all the upstream servers set up here
