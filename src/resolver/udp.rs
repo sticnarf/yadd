@@ -3,7 +3,7 @@ use super::*;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use crate::STDOUT;
+use crate::STDERR;
 
 use slog::debug;
 use trust_dns::client::BasicClientHandle;
@@ -27,7 +27,7 @@ impl SimpleUdpResolver {
         let (stream, handle) = UdpClientStream::new(server_addr);
         let (bg, handle) = ClientFuture::with_timeout(stream, handle, timeout, None);
         debug!(
-            STDOUT,
+            STDERR,
             "SimpleUdpResolver initialized. DNS requests are forwarded to {}.", server_addr
         );
         tokio::spawn(bg);
@@ -39,7 +39,7 @@ impl Resolver for SimpleUdpResolver {
     fn query(
         &self,
         query: Query,
-    ) -> Box<Future<Item=DnsResponse, Error=ProtoError> + 'static + Send> {
+    ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send> {
         Box::new(self.handle.clone().lookup(query, DNS_OPTIONS))
     }
 }
