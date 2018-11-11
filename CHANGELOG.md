@@ -1,3 +1,15 @@
+# 0.3.0
+
+* Support DNS over TLS
+
+* Support dispatching rules
+
+* Default ports can now be ignored in the DNS address
+
+* Move explanations of configurations to the comments of a config template.
+
+**Config file of version 0.2.\* is not supported.** 
+
 # 0.2.3
 
 * Returns SERVFAIL when no response is available.
