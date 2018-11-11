@@ -22,7 +22,7 @@ lazy_static! {
 
 fn main() {
     let conf = config().unwrap_or_log();
-    debug!(STDERR, "{:?}", conf);
+    debug!(STDERR, "{:#?}", conf);
 
     let bind =
         UdpSocket::bind(&conf.bind).unwrap_or_log_with(format!("Unable to bind to {}", conf.bind));

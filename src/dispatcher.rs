@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::config::Domains;
 use crate::config::Upstream;
-use crate::config::{Config, Rule, RuleAction};
+use crate::config::{Config, RequestRule, ResponseRule, RuleAction};
 use crate::ip::IpRange;
 use crate::resolver::tcp::{
     SimpleTcpDnsStreamBuilder, SimpleTcpResolver, TlsDnsStreamBuilder, TlsResolver,
@@ -32,7 +32,8 @@ pub struct Dispatcher {
     resolvers: Arc<HashMap<String, Arc<Resolver>>>,
     domains: Arc<HashMap<String, Domains>>,
     ranges: Arc<HashMap<String, IpRange>>,
-    rules: Arc<Vec<Rule>>,
+    request_rules: Arc<Vec<RequestRule>>,
+    response_rules: Arc<Vec<ResponseRule>>,
 }
 
 impl Dispatcher {
@@ -64,7 +65,8 @@ impl Dispatcher {
             resolvers: Arc::new(resolvers),
             domains: Arc::new(config.domains),
             ranges: Arc::new(config.ranges),
-            rules: Arc::new(config.rules),
+            request_rules: Arc::new(config.request_rules),
+            response_rules: Arc::new(config.response_rules),
         }
     }
 
@@ -76,14 +78,14 @@ impl Dispatcher {
             return RuleAction::Drop;
         }
 
-        let check_upstream = |rule: &Rule| {
+        let check_upstream = |rule: &ResponseRule| {
             rule.upstreams
                 .as_ref()
                 .map(|u| u.iter().any(|s| s == upstream_name))
                 .unwrap_or(true)
         };
 
-        let check_ranges = |rule: &Rule| {
+        let check_ranges = |rule: &ResponseRule| {
             rule.ranges
                 .as_ref()
                 .map(|r| {
@@ -113,7 +115,7 @@ impl Dispatcher {
                 .unwrap_or(true) // No ranges field means matching all ranges
         };
 
-        let check_domains = |rule: &Rule| {
+        let check_domains = |rule: &ResponseRule| {
             rule.domains
                 .as_ref()
                 .map(|d| {
@@ -131,7 +133,7 @@ impl Dispatcher {
                 .unwrap_or(true) // No domains field means matching all domains
         };
 
-        self.rules
+        self.response_rules
             .iter()
             .find(|rule| check_upstream(rule) && check_ranges(rule) && check_domains(rule))
             .map(|rule| rule.action)
@@ -140,27 +142,50 @@ impl Dispatcher {
 
     fn dispatch(&self, query: &Query) -> Vec<(&str, Arc<Resolver>)> {
         let name = query.name().to_ascii();
-        // Find domains section which has an upstream field and matches the name
-        let result = self
-            .domains
-            .iter()
-            .filter(|(_, domains)| domains.upstreams.is_some())
-            .find(|(_, domains)| domains.regex_set.is_match(&name));
-        if let Some((tag, domains)) = result {
-            debug!(STDERR, "Query {} matches {}", name, tag);
-            domains
-                .upstreams
+        // TODO: Most part of this is identical to that in the `check_response` function
+        //       Need refactoring
+        let check_domains = |rule: &RequestRule| {
+            rule.domains
                 .as_ref()
-                .unwrap()
+                .map(|d| {
+                    d.iter().any(|domains_pattern| {
+                        // Process the leading `!`
+                        let domains_tag = domains_pattern.trim_start_matches('!');
+                        let toggle = (domains_pattern.len() - domains_pattern.len()) % 2 == 1;
+
+                        let domains = self.domains.get(domains_tag);
+                        domains
+                            .map(|domains| domains.regex_set.is_match(&name) ^ toggle)
+                            .unwrap_or(false)
+                    })
+                })
+                .unwrap_or(true) // No domains field means matching all domains
+        };
+
+        let check_type = |rule: &RequestRule| {
+            rule.types
+                .as_ref()
+                .map(|l| l.iter().any(|t| *t == query.query_type()))
+                .unwrap_or(true)
+        };
+
+        let rule = self
+            .request_rules
+            .iter()
+            .find(|r| check_domains(r) && check_type(r));
+
+        if let Some(rule) = rule {
+            debug!(STDERR, "Query {} matches rule {:?}", name, rule);
+            rule.upstreams
                 .iter()
                 .filter_map(|u| self.resolvers.get(u).map(|v| (u.as_str(), v.clone())))
                 .collect()
         } else {
             debug!(
                 STDERR,
-                "No domain specific setting matches for {}. Use defaults.", name
+                "No dispatching rule matches for {}. Use defaults.", name
             );
-            // If no domains section matches, use defaults
+            // If no dispatching rule matches, use defaults
             self.defaults
                 .iter()
                 .filter_map(|u| self.resolvers.get(u).map(|v| (u.as_str(), v.clone())))
@@ -190,7 +215,7 @@ impl Resolver for Dispatcher {
 
         fn process_all<A>(
             dispatcher: Dispatcher,
-            tasks: future::SelectAll<A>,
+            tasks: future::SelectAll<A>, // responses that are not received yet
         ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send>
         where
             A: Future<Item = (String, String, DnsResponse), Error = (String, ProtoError)>

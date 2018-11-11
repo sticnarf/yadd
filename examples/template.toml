@@ -82,7 +82,7 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
 # If no rule is matched, the request will be forwarded to all default servers.
 [[requests]]
   domains = ["opennic"] # requires that the domain is in one of the specific domain lists
-  type = ["A", "AAAA"] # requires that the record type is in the list
+  types = ["A", "AAAA"] # requires that the record type is in the list
   # Here defines the names of the upstream servers you would like to dispatch the requests to.
   # The default upstream servers are ignored. Requests are forwarded only to the servers defined here.
   upstreams = ["opennic"]
@@ -97,7 +97,7 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
 
 # This rule instructs yadd to dispatch AAAA queries to specific upstreams.
 [[requests]]
-  type = ["AAAA"]
+  types = ["AAAA"]
   upstreams = ["opendns_v6", "cloudflare"]
 
 # Multiple rules can be defined to filter responses.
