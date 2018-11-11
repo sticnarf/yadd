@@ -22,7 +22,6 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
   [upstreams.opendns_v6]
     # IPv6 is supported.
     address = "[2620:0:ccc::2]:5353"
-    # TCP is supported
     network = "tcp"
 
   [upstreams.cloudflare]
@@ -77,8 +76,8 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
 # Dispatching rules are defined in 'requests' tables. They are used to determine
 # which upstream servers the requests are forwarded to.
 # If all defined requirements are met, the rule is applied.
-# Dispatching rules are applied in the same order as they are defined.
-# Only the first matched rule is applied.
+# Dispatching rules are checked in the same order as they are defined.
+# Only the first matched rule will be applied.
 # If no rule is matched, the request will be forwarded to all default servers.
 [[requests]]
   domains = ["opennic"] # requires that the domain is in one of the specific domain lists
@@ -91,8 +90,6 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
   # The domains array can contain tags with a leading `!` for inversion.
   # For instance, '!poisoned' matches all domains which are not in the 'poisoned' domain list.
   domains = ["!poisoned"]
-  # Here defines the names of the upstream servers you would like to dispatch the requests to.
-  # The default upstream servers are ignored. Requests are forwarded only to the servers defined here.
   upstreams = ["dnspod"]
 
 # This rule instructs yadd to dispatch AAAA queries to specific upstreams.
@@ -102,13 +99,13 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
 
 # Multiple rules can be defined to filter responses.
 # If all defined requirements are met, the rule is applied.
-# Rules are checked in the same order as they defined. Only the first matched rule is applied.
+# Rules are checked in the same order as they defined. Only the first matched rule will be applied.
+# The first response which is not dropped is adopted and returned to the client.
 [[responses]]
   upstreams = ["opendns", "opendns_v6"] # requires the response is from one of the specific upstream servers
   ranges = ["my_range"] # requires the response IP is in one of the specific IP ranges
   domains = ["poisoned"] # requires the domain is in one of the specific domain lists
-  # Currently, 'drop' is the only action available.
-  # The first response not dropped is adopted and returned to the client.
+  # Currently, 'drop' is the only available action.
   # More actions may be added in the future.
   action = "drop"
 
