@@ -22,6 +22,7 @@ main() {
 
     # TODO Update this to package the right artifacts
     cp target/$TARGET/release/yadd $stage/
+    cp -r examples $stage/
     cp chnroutes.txt $stage/
     cp config.toml $stage/
 
