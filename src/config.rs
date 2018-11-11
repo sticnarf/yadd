@@ -3,14 +3,17 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 use crate::ip::IpRange;
+use crate::Transpose;
 
 use failure::{err_msg, Error};
 use ipnet::IpNet;
+use regex::RegexSet;
 use serde_derive::Deserialize;
 use std::net::IpAddr;
-use regex::RegexSet;
+use trust_dns_proto::rr::record_type::RecordType;
 
 #[derive(Debug)]
 pub struct Config {
@@ -19,16 +22,18 @@ pub struct Config {
     pub upstreams: HashMap<String, Upstream>,
     pub domains: HashMap<String, Domains>,
     pub ranges: HashMap<String, IpRange>,
-    pub rules: Vec<Rule>,
+    pub request_rules: Vec<RequestRule>,
+    pub response_rules: Vec<ResponseRule>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigBuilder {
     bind: SocketAddr,
     upstreams: HashMap<String, UpstreamConfig>,
-    domains: HashMap<String, DomainsConf>,
-    ranges: HashMap<String, IpRangeConf>,
-    rules: Vec<Rule>,
+    domains: Option<HashMap<String, DomainsConf>>,
+    ranges: Option<HashMap<String, IpRangeConf>>,
+    requests: Option<Vec<RequestRuleConfig>>,
+    responses: Option<Vec<ResponseRule>>,
 }
 
 #[derive(Debug)]
@@ -49,41 +54,55 @@ impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Error> {
         let mut default_upstreams = Vec::new();
 
-        let upstreams: Result<HashMap<String, Upstream>, Error> = self
+        let upstreams = self
             .upstreams
             .into_iter()
             .map(|(key, upstream)| {
-                if upstream.default { default_upstreams.push(key.clone()) }
+                if upstream.default {
+                    default_upstreams.push(key.clone())
+                }
                 upstream.build().map(move |upstream| (key, upstream))
             })
-            .collect();
+            .collect::<Result<HashMap<_, _>, Error>>()?;
 
         if default_upstreams.is_empty() {
-            return Err(err_msg("You must configure at least one default upstream server!"));
+            return Err(err_msg(
+                "You must configure at least one default upstream server!",
+            ));
         }
 
-        let domains: Result<HashMap<String, Domains>, Error> =  self
+        let domains = self
             .domains
+            .unwrap_or_default()
             .into_iter()
             .map(|(key, domains)| domains.build().map(move |domains| (key, domains)))
-            .collect();
+            .collect::<Result<HashMap<_, _>, Error>>()?;
 
-        let ranges: Result<HashMap<String, IpRange>, Error> = self
+        let ranges = self
             .ranges
+            .unwrap_or_default()
             .into_iter()
             .map(|(key, conf)| {
                 let mut range = IpRange::new();
                 conf.read_to(&mut range).map(|()| (key, range))
             })
-            .collect();
+            .collect::<Result<HashMap<_, _>, Error>>()?;
+
+        let request_rules: Vec<RequestRule> = self
+            .requests
+            .unwrap_or_default()
+            .into_iter()
+            .map(|r| r.build())
+            .collect::<Result<Vec<_>, Error>>()?;
 
         Ok(Config {
             bind: self.bind,
             default_upstreams,
-            upstreams: upstreams?,
-            domains: domains?,
-            ranges: ranges?,
-            rules: self.rules,
+            upstreams,
+            domains,
+            ranges,
+            request_rules,
+            response_rules: self.responses.unwrap_or_default(),
         })
     }
 }
@@ -95,7 +114,7 @@ struct UpstreamConfig {
     #[serde(rename = "tls-host")]
     tls_host: Option<String>,
     #[serde(default = "UpstreamConfig::default_default")]
-    default: bool
+    default: bool,
 }
 
 impl UpstreamConfig {
@@ -181,14 +200,12 @@ impl IpRangeConf {
 #[derive(Debug)]
 pub struct Domains {
     pub regex_set: RegexSet,
-    pub upstreams: Option<Vec<String>>
 }
 
 #[derive(Debug, Deserialize)]
 struct DomainsConf {
     files: Option<Vec<String>>,
     list: Option<Vec<String>>,
-    upstreams: Option<Vec<String>>
 }
 
 impl DomainsConf {
@@ -199,10 +216,6 @@ impl DomainsConf {
     }
 
     fn build(self) -> Result<Domains, Error> {
-        if self.upstreams.as_ref().map(|u| u.is_empty()).unwrap_or(false) {
-            return Err(err_msg("An empty array is not allowed in the upstream field."));
-        }
-
         let mut vec = Vec::new();
 
         if let Some(files) = &self.files {
@@ -228,13 +241,42 @@ impl DomainsConf {
 
         Ok(Domains {
             regex_set: RegexSet::new(&vec)?,
-            upstreams: self.upstreams
         })
     }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Rule {
+struct RequestRuleConfig {
+    domains: Option<Vec<String>>,
+    types: Option<Vec<String>>,
+    upstreams: Vec<String>,
+}
+
+impl RequestRuleConfig {
+    fn build(self) -> Result<RequestRule, Error> {
+        let types = Transpose::transpose(self.types.map(|v| {
+            v.iter()
+                .map(|t| RecordType::from_str(t))
+                .collect::<Result<Vec<_>, _>>()
+        }))?;
+
+        Ok(RequestRule {
+            domains: self.domains,
+            types,
+            upstreams: self.upstreams,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct RequestRule {
+    pub domains: Option<Vec<String>>,
+    pub types: Option<Vec<RecordType>>,
+    pub upstreams: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResponseRule {
     pub upstreams: Option<Vec<String>>,
     pub ranges: Option<Vec<String>>,
     pub domains: Option<Vec<String>>,

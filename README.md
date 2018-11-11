@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/sticnarf/yadd.svg?branch=master)](https://travis-ci.org/sticnarf/yadd) [![AppVeyor Status](https://ci.appveyor.com/api/projects/status/github/sticnarf/yadd?branch=master&svg=true)](https://ci.appveyor.com/project/sticnarf/yadd)
 
-Yadd (**Y**et **A**nother **D**NS **D**ispatcher) forwards DNS queries to multiple servers at the same time and decides which result to return by custom rules.
+Yadd (**Y**et **A**nother **D**NS **D**ispatcher) forwards DNS queries to multiple servers in parallel and decides which result to return by custom rules.
 
 It aims to be fast and flexible but yet easy to use.
 
@@ -15,14 +15,12 @@ Because the docs in the master branch may be newer than the release you use, ple
 * DNS over various protocols
   * UDP
   * TCP
-  * **TLS**
+  * TLS
 
-* Full control over dispatching
-  * Dispatch requests based on domain lists
-  * Filter responses based on custom rules (consisting of IP ranges and more)
+* Rule based dispatching and response filtering
 
 * Good performance
-  * Forward to all upstreams simultaneously
+  * Parallel forwarding
   * TCP connection reuse
   
 ## Usage
@@ -35,7 +33,7 @@ $ ./yadd -c <CONFIG_FILE>
 
 If you ignore `-c`, yadd will load `config.toml`.
 
-*Note: All non-absolute file paths (in the command line arguments and in the config file) are relative to the working directory instead of the location of the executable.*
+*Note: All non-absolute file paths (in the command line arguments and in the config file) are relative to the working directory instead of the location of the executable or the config file.*
 
 ## Examples
 

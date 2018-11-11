@@ -22,7 +22,7 @@ bind = "127.0.0.1:5300"
   [ranges.cn]
   files = ["chnroutes.txt"]
 
-[[rules]]
+[[responses]]
 upstreams = ["dnspod", "alidns"]
 ranges = ["!cn"]
 action = "drop"

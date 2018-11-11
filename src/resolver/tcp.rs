@@ -1,5 +1,5 @@
-use super::*;
 use self::ConnectionState::*;
+use super::*;
 
 use std::net::SocketAddr;
 use std::sync::Arc;

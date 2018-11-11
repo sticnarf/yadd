@@ -37,10 +37,10 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
     address = "2a05:dfc7:5::53"
     network = "udp"
     # This tells yadd not to forward requests to this server by default.
-    # But you can use it for specific domains.
+    # But you can use it by applying dispatching rules.
     default = false
 
-# You define domain lists here.
+# Domain lists are defined here. They can be used later in your rules.
 [domains]
   # The 'opennic' is the tag of the domain list.
   # It is useful in the rules later in the file.
@@ -52,9 +52,6 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
       ".bbs", ".chan", ".cyb", ".dyn", ".geek", ".gopher", ".indy",
       ".libre", ".neo", ".null", ".o", ".oss", ".oz", ".parody", ".pirate"
     ]
-    # If you define the upstreams field in a domain list, yadd will forward the requests
-    # ONLY towards the upstream servers defined here.
-    upstreams = ["opennic"]
 
   [domains.poisoned]
     list = ["twitter.com", "facebook.com", "youtube.com"]
@@ -62,9 +59,6 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
     # to read them from files. Each file should contain lines of patterns only,
     # except empty lines and lines starting with `#`, which means it is a comment.
     files = ["gfwlist.txt"]
-    # If no upstreams field is defined, yadd will simply forwards the requests
-    # to default upstream servers.
-
 
 # Set up the IP ranges you want to use later in your rules here.
 [ranges]
@@ -80,27 +74,53 @@ bind = "127.0.0.1:5300" # the address that yadd listens on
   files = ["chnroutes.txt"]
   # Of course, it is okay to use 'list' or 'files' alone to define an IP range.
 
+# Dispatching rules are defined in 'requests' tables. They are used to determine
+# which upstream servers the requests are forwarded to.
+# If all defined requirements are met, the rule is applied.
+# Dispatching rules are applied in the same order as they are defined.
+# Only the first matched rule is applied.
+# If no rule is matched, the request will be forwarded to all default servers.
+[[requests]]
+  domains = ["opennic"] # requires that the domain is in one of the specific domain lists
+  types = ["A", "AAAA"] # requires that the record type is in the list
+  # Here defines the names of the upstream servers you would like to dispatch the requests to.
+  # The default upstream servers are ignored. Requests are forwarded only to the servers defined here.
+  upstreams = ["opennic"]
+
+[[requests]]
+  # The domains array can contain tags with a leading `!` for inversion.
+  # For instance, '!poisoned' matches all domains which are not in the 'poisoned' domain list.
+  domains = ["!poisoned"]
+  # Here defines the names of the upstream servers you would like to dispatch the requests to.
+  # The default upstream servers are ignored. Requests are forwarded only to the servers defined here.
+  upstreams = ["dnspod"]
+
+# This rule instructs yadd to dispatch AAAA queries to specific upstreams.
+[[requests]]
+  types = ["AAAA"]
+  upstreams = ["opendns_v6", "cloudflare"]
+
 # Multiple rules can be defined to filter responses.
 # If all defined requirements are met, the rule is applied.
-# Rules are checked in the same order as they defined. The first matched rule is applied.
-[[rules]]
-upstreams = ["opendns", "opendns_v6"] # requires the response is from one of the specific upstream servers
-ranges = ["my_range"] # requires the response IP is in one of the specific IP ranges
-domains = ["poisoned"] # requires the domain is in one of the specific domain lists
-# Currently, 'drop' is the only action available.
-# The first response not dropped is adopted and returned to the client.
-# More actions may be added in the future.
-action = "drop"
+# Rules are checked in the same order as they defined. Only the first matched rule is applied.
+[[responses]]
+  upstreams = ["opendns", "opendns_v6"] # requires the response is from one of the specific upstream servers
+  ranges = ["my_range"] # requires the response IP is in one of the specific IP ranges
+  domains = ["poisoned"] # requires the domain is in one of the specific domain lists
+  # Currently, 'drop' is the only action available.
+  # The first response not dropped is adopted and returned to the client.
+  # More actions may be added in the future.
+  action = "drop"
 
-[[rules]]
-upstreams = ["dnspod"]
-# The ranges and domains array can contain names with a leading `!` for inversion.
-# For instance, `!my_range` matches all IP addresses which are not in the `my_range` range.
-ranges = ["!my_range"]
-domains = ["!poisoned"]
-action = "drop"
+[[responses]]
+  upstreams = ["dnspod"]
+  # The ranges and domains array can contain names with a leading `!` for inversion.
+  # For instance, `!my_range` matches all IP addresses which are not in the `my_range` range.
+  ranges = ["!my_range"]
+  domains = ["!poisoned"]
+  action = "drop"
 
-[[rules]]
-# It is also allowed to have no requirements.
-# This rule matches all responses. So It will drop all the responses.
-action = "drop"
+[[responses]]
+  # It is also allowed to have no requirements.
+  # This rule matches all responses. So It will drop all the responses.
+  action = "drop"
