@@ -16,4 +16,7 @@ bind = "127.0.0.1:5300"
     ".bbs", ".chan", ".cyb", ".dyn", ".geek", ".gopher", ".indy",
     ".libre", ".neo", ".null", ".o", ".oss", ".oz", ".parody", ".pirate"
   ]
-  upstreams = ["opennic"]
+
+[[requests]]
+domains = ["opennic"]
+upstreams = ["opennic"]
