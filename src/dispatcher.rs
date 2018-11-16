@@ -215,37 +215,40 @@ impl Resolver for Dispatcher {
 
         fn process_all<A>(
             dispatcher: Dispatcher,
-            tasks: future::SelectAll<A>, // responses that are not received yet
+            tasks: Vec<A>, // responses that are not received yet
         ) -> Box<Future<Item = DnsResponse, Error = ProtoError> + 'static + Send>
         where
             A: Future<Item = (String, String, DnsResponse), Error = (String, ProtoError)>
                 + 'static
                 + Send,
         {
-            Box::new(tasks.then(|res| match res {
-                Ok(((domain, name, resp), _, remaining)) => {
-                    match dispatcher.check_response(&domain, &name, &resp) {
-                        RuleAction::Accept => {
-                            // Ignore the remaining future
-                            tokio::spawn(future::join_all(remaining).map(|_| ()).map_err(|_| ()));
-                            debug!(STDERR, "Use result from {}", name);
-                            Box::new(future::ok(resp))
+            if tasks.is_empty() {
+                Box::new(future::err("No response available".into()))
+            } else {
+                let tasks = future::select_all(tasks);
+                Box::new(tasks.then(|res| match res {
+                    Ok(((domain, name, resp), _, remaining)) => {
+                        match dispatcher.check_response(&domain, &name, &resp) {
+                            RuleAction::Accept => {
+                                // Ignore the remaining future
+                                tokio::spawn(
+                                    future::join_all(remaining).map(|_| ()).map_err(|_| ()),
+                                );
+                                debug!(STDERR, "Use result from {}", name);
+                                Box::new(future::ok(resp))
+                            }
+                            RuleAction::Drop => process_all(dispatcher, remaining),
                         }
-                        RuleAction::Drop => process_all(dispatcher, future::select_all(remaining)),
                     }
-                }
-                Err(((name, e), _, remaining)) => {
-                    error!(STDERR, "{}: {}", name, e);
-                    if remaining.len() > 0 {
-                        process_all(dispatcher, future::select_all(remaining))
-                    } else {
-                        Box::new(future::err(e))
+                    Err(((name, e), _, remaining)) => {
+                        error!(STDERR, "{}: {}", name, e);
+                        process_all(dispatcher, remaining)
                     }
-                }
-            }))
+                }))
+            }
         }
 
-        process_all(self.clone(), future::select_all(tasks))
+        process_all(self.clone(), tasks)
     }
 }
 
