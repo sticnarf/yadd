@@ -1,3 +1,9 @@
+# 0.3.1
+
+* Fix panics on select_all
+
+* Use rustls for platforms that ring works on
+
 # 0.3.0
 
 * Support DNS over TLS
