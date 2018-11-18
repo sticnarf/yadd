@@ -5,10 +5,9 @@ authors = ["Yilin Chen <sticnarf@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-trust-dns = { version = "0.15.0", git = "https://github.com/bluejekyll/trust-dns", features = ['dns-over-tls'] }
+trust-dns = { version = "0.15.0", git = "https://github.com/bluejekyll/trust-dns" }
 trust-dns-proto = { version = "0.5.0", git = "https://github.com/bluejekyll/trust-dns" }
 trust-dns-server = { version = "0.15.0", git = "https://github.com/bluejekyll/trust-dns" }
-trust-dns-native-tls = { version = "0.4.0", git = "https://github.com/bluejekyll/trust-dns" }
 tokio = "0.1.11"
 slog = "2.4.1"
 slog-term = "2.4.0"
@@ -27,7 +26,17 @@ tokio-tcp = "0.1.2"
 tokio-tls = "0.2.0"
 regex = "1"
 
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_arch = "mips", target_arch = "mips64", all(target_os = "freebsd", target_arch = "x86")))'.dependencies]
+trust-dns-native-tls = { version = "0.4.0", git = "https://github.com/bluejekyll/trust-dns" }
+
+[target.'cfg(not(any(target_os = "macos", target_os = "windows", target_arch = "mips", target_arch = "mips64", all(target_os = "freebsd", target_arch = "x86"))))'.dependencies]
+rustls = "0.14.0"
+webpki-roots = "0.15.0"
+trust-dns-rustls = { version = "0.4.0", git = "https://github.com/bluejekyll/trust-dns" }
+
 [profile.release]
 lto = true
 codegen-units = 1
 panic = 'abort'
+debug = true
+opt-level = 'z'

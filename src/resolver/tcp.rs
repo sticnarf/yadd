@@ -17,8 +17,6 @@ use tokio::timer::Delay;
 use trust_dns::client::ClientStreamHandle;
 use trust_dns::client::{BasicClientHandle, ClientFuture};
 use trust_dns::tcp::TcpClientStream;
-use trust_dns_native_tls::TlsClientStream;
-use trust_dns_native_tls::TlsClientStreamBuilder;
 use trust_dns_proto::error::ProtoError;
 use trust_dns_proto::error::ProtoErrorKind;
 use trust_dns_proto::op::Query;
@@ -68,21 +66,6 @@ pub struct TlsDnsStreamBuilder {
 impl TlsDnsStreamBuilder {
     pub fn new(name_server: SocketAddr, host: String) -> Self {
         TlsDnsStreamBuilder { name_server, host }
-    }
-}
-
-impl TcpDnsStreamBuilder for TlsDnsStreamBuilder {
-    type Connect = Box<dyn Future<Item = TlsClientStream, Error = ProtoError> + Send>;
-    type Stream = TlsClientStream;
-
-    fn with_timeout(
-        &self,
-        timeout: Duration,
-    ) -> (Self::Connect, Box<dyn ClientStreamHandle + 'static + Send>) {
-        // TODO Timeout is ignored because TlsClientStreamBuilder does not support a timeout
-        let (stream, handle) =
-            TlsClientStreamBuilder::new().build(self.name_server, self.host.clone());
-        (stream, Box::new(handle))
     }
 }
 
@@ -297,6 +280,26 @@ impl<B: TcpDnsStreamBuilder> Future for TcpResponse<B> {
         }
     }
 }
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "windows",
+    target_arch = "mips",
+    target_arch = "mips64",
+    all(target_os = "freebsd", target_arch = "x86")
+))]
+#[path = "./tls/native.rs"]
+mod tls;
+
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "windows",
+    target_arch = "mips",
+    target_arch = "mips64",
+    all(target_os = "freebsd", target_arch = "x86")
+)))]
+#[path = "./tls/rustls.rs"]
+mod tls;
 
 #[cfg(test)]
 mod tests {
