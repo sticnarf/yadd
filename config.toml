@@ -1,1 +1,47 @@
-examples/chinadns.toml
+# This file is a combination of examples/chinadns.toml and examples/opennic.toml.
+# Check examples/template.toml for advanced usages.
+
+bind = "127.0.0.1:5300"
+
+[upstreams]
+  [upstreams.dnspod]
+  address = "119.29.29.29"
+  network = "udp"
+
+  [upstreams.alidns]
+  address = "223.5.5.5"
+  network = "udp"
+
+  [upstreams.opendns]
+  address = "208.67.222.222:5353"
+  network = "tcp"
+
+  [upstreams.cloudflare]
+  address = "1.1.1.1"
+  network = "tls"
+  tls-host = "cloudflare-dns.com"
+
+  [upstreams.opennic]
+  address = "185.121.177.177"
+  network = "udp"
+  default = false
+
+[domains]
+  [domains.opennic]
+  list = [
+    ".bbs", ".chan", ".cyb", ".dyn", ".geek", ".gopher", ".indy",
+    ".libre", ".neo", ".null", ".o", ".oss", ".oz", ".parody", ".pirate"
+  ]
+
+[[requests]]
+domains = ["opennic"]
+upstreams = ["opennic"]
+
+[ranges]
+  [ranges.cn]
+  files = ["chnroutes.txt"]
+
+[[responses]]
+upstreams = ["dnspod", "alidns"]
+ranges = ["!cn"]
+action = "drop"
